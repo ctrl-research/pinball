@@ -1,5 +1,12 @@
 # Git ignore
 
+# Godot
+# .godot/ is the editor's import cache and is regenerated on open.
+# export_presets.cfg IS committed -- CI exports from it.
+.godot/
+/build/
+*.translation
+
 # Environment and secrets
 .env
 .env.local
