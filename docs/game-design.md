@@ -1,0 +1,262 @@
+# TILT — Game Design (working title)
+
+An arcade **pixel-art pinball roguelike**. One silver ball, a table you rebuild
+between rounds, and a score target that grows faster than you do.
+
+Think **Balatro's run structure poured into a pinball cabinet**: every stage is
+a score you have to beat with a limited number of balls, and the way you beat it
+is the pile of relics, table mods, and target upgrades you've bolted onto the
+machine along the way. The direct ancestors are Balatro (score gates, escalating
+antes, build-defining jokers, a shop between everything) and Pegfinity (physics
+toy as the scoring engine), sat on top of the tactile layer of *3D Pinball:
+Space Cadet* — flippers, plunger, nudge, tilt.
+
+## Why pinball is the right physics toy for this
+
+Balatro works because a hand of cards is a **small, repeatable, high-variance
+event** that a stack of modifiers can hook into. A pinball **ball** is the same
+shape of thing: it starts, it does an unpredictable amount of work, it drains.
+Three balls per stage is three hands per blind.
+
+Better still, pinball already invented Balatro's core arithmetic decades
+earlier. Real machines have a **playfield multiplier** that builds during a ball
+and resets when it drains, applied to the base value of everything you hit. That
+is chips × mult, and it is native vocabulary here — no reskinning required.
+
+## The screen
+
+Portrait table on the left, panel on the right — the *Space Cadet* arrangement,
+and the panel is where the roguelike lives.
+
+```
+ 640 x 360 viewport
+┌──────────────────┬──────────────────────────────────┐
+│                  │  ANTE 3      BOSS · THE GOVERNOR │
+│    ╭──────╮      │  ┌────┐┌────┐┌────┐┌────┐┌────┐  │
+│   │  ◉ ◉   │     │  │BRAS││COMB││BALL││    ││    │  │  ← relic row
+│   │   ◉    │     │  └────┘└────┘└────┘└────┘└────┘  │
+│   │ ▬▬▬    │     │                                  │
+│   │        │     │      SCORE   12,480 / 20,000     │
+│   │        │     │                                  │
+│   │ ◣    ◢ │     │      VALUE  120  ×  MULT 4.0     │
+│   │  \  /  │     │                                  │
+│    ╰──────╯      │   BALLS ●●○      NUDGE ▮▮○   $14 │
+└──────────────────┴──────────────────────────────────┘
+```
+
+The table occupies x ∈ [16, 296]; the panel owns the rest. Base resolution is
+640×360 with `canvas_items` stretch and nearest-neighbour filtering, so the
+pixel grid survives any window size — same setup as `rogue-like`.
+
+## The run
+
+**8 antes × 3 stages.** Small blind, big blind, boss blind, then the ante
+advances and the numbers get worse. Lose a stage and the run is over.
+
+| | |
+| --- | --- |
+| **Stage** | Beat a score target using 3 balls. |
+| **Ball** | Plunge, play, drain. The playfield MULT resets between balls. |
+| **Clear** | Bank tokens, take a reward, visit the shop. |
+| **Fail** | Balls exhausted below target → run over. |
+
+Score targets follow Balatro's ante curve, because it is a curve that is known
+to work — it roughly triples early and then stretches:
+
+| Ante | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Base | 300 | 800 | 2,000 | 5,000 | 11,000 | 20,000 | 35,000 | 50,000 |
+
+Small blind = base ×1, big blind = ×1.5, boss blind = ×2.
+
+### Scoring
+
+Every scoring element carries a **value**. The playfield carries a **MULT**.
+
+```
+score += value × MULT        (banked on the hit, not on the drain)
+```
+
+Banking on the hit rather than at ball-end is a deliberate departure from
+Balatro. Balatro reveals chips × mult as a punchline because a hand is a
+discrete, instant event. A ball is *continuous* — twenty seconds of live
+physics — and a score that only resolves on the drain would mean the player
+spends that entire time unable to read whether they are winning. Real pinball
+scores as you hit things, the readout climbing while the ball is alive, and that
+running climb is most of the drama. So: bank immediately, and let MULT be the
+thing that carries the tension of keeping the ball alive.
+
+MULT starts each ball at ×1 and only ever goes up during that ball. Draining
+loses it. That is the whole risk curve of the game in one sentence: **the ball
+that has been alive longest is worth the most and is the one you can least
+afford to lose.**
+
+### Balls, nudges, tilt
+
+Three balls per stage. Two **nudges** per ball — a table bump that shoves the
+ball a few pixels and is the only tool you have against a bad bounce. A third
+nudge in quick succession **tilts**: flippers die, the ball drains, MULT is
+lost. Nudge is this game's discard — a scarce, skill-expressive way to buy back
+a mistake, with a hard punishment for greed.
+
+### Economy
+
+Tokens (`$`) are earned on a stage clear and spent in the shop.
+
+- Base reward per blind: small `$3`, big `$4`, boss `$5`
+- `$1` per unused ball — do not need the third ball, get paid for it
+- Interest: `$1` per `$5` held, capped at `$5`
+
+The unused-ball payout is the same lever as Balatro's unused hands: it makes
+overshooting a small blind on one ball an actual strategy rather than a waste.
+
+## The build — three layers of modifier
+
+### Relics (jokers)
+
+Up to **5 slots** on the panel. Passive, always-on, and the primary axis of a
+build. They hook a small set of events: `on_hit`, `on_score`, `on_ball_start`,
+`on_drain`, `on_stage_start`.
+
+| Relic | Effect |
+| --- | --- |
+| Brass Bumper | Pop bumpers score ×3 value |
+| Combo Coil | Each hit within 1.5s of the last: +0.2 MULT |
+| Slingshot Savant | Slingshots score +25 value |
+| Skill Shot | First target hit each ball scores ×5 |
+| Ball Saver | First drain each stage returns the ball |
+| Deadhead | MULT no longer resets between balls |
+| Tilt Gremlin | +2 MULT while you have no nudges left |
+| Drop Devotion | Clearing a drop bank: +1 MULT for the rest of the stage |
+| Spinner Fever | Each spin this ball raises spinner value by 5 |
+| Outlane Insurance | Draining down an outlane pays `$3` |
+| Penny Slot | `$1` per 1,000 points scored |
+| Magnet Coil | Every 10 bumper hits spawns a second ball |
+| Jackpot Lamp | Every 8th target hit scores a flat 500 × MULT |
+| Cold Solder | −1 ball per stage, but all values ×2 |
+
+`Deadhead` is the deliberate build-breaker, the way Balatro keeps one joker that
+invalidates a core rule. It converts the game from "three separate attempts" to
+"one long accumulating attempt", and it should be rare and expensive.
+
+### Table mods (vouchers)
+
+Permanent changes to the **physical playfield** — the roguelike lever that
+pinball has and card games do not. Because the table is generated from a data
+layout rather than hand-placed in a scene, a mod is just an edit to that data.
+
+- **Extra Bumper** — a fourth pop bumper joins the cluster
+- **Wide Flippers** — +4px flipper length, narrowing the drain gap
+- **Post Rubber** — a centre post between the flippers; catches some drains
+- **Outlane Guards** — narrows both outlanes
+- **Second Spinner** — a spinner on the left orbit
+- **Kicker** — the left outlane kicks the ball back into play once per ball
+
+### Target levels (planet cards)
+
+Level up a *class* of target rather than an instance. `Bumpers Lv3` raises the
+base value of every bumper on the table. This is the flat-power axis that keeps
+pace with the score curve when the relic pool goes dry, and it is what makes a
+table mod that adds a fourth bumper worth more later than it was early.
+
+| Class | Base value | Per level |
+| --- | --- | --- |
+| Pop bumper | 10 | +8 |
+| Slingshot | 15 | +10 |
+| Drop target | 50 | +35 |
+| Standup target | 30 | +20 |
+| Spinner (per rev) | 5 | +4 |
+| Rollover lane | 25 | +15 |
+| Orbit | 100 | +60 |
+
+## Boss blinds
+
+The boss blind is a **hazard applied to the machine**, not a bigger number. Each
+one attacks a different part of the build, so a run that has leaned entirely on
+one axis meets a wall.
+
+| Boss | Effect |
+| --- | --- |
+| The Governor | MULT is capped at ×4 |
+| The Dead Bumper | Pop bumpers score nothing |
+| The Drain | Outlanes are twice as wide |
+| The Short Ball | 2 balls instead of 3 |
+| The Warp | The left flipper dies for 3s at a time |
+| The Tilt | Nudges disabled |
+| The Reset | Every 5th hit resets MULT to ×1 |
+| The Fog | The upper third of the playfield is not drawn |
+
+`The Fog` is the one that is about the player rather than the build — it takes
+away information, not power, and a player who knows the table by feel beats it.
+
+## The table
+
+One machine for now. Variety comes from mods and relics rather than from a table
+pool; a second table is worth building only once the modifier layers are proven,
+because every table has to be balanced against all of them.
+
+Playfield, in table-local pixels (280 × 344):
+
+- **Plunger lane** down the right edge, with a one-way gate at the top
+- **Top arch** with two **rollover lanes**
+- **Pop bumper cluster** — three, upper middle
+- **Drop target bank** — three, upper left
+- **Standup targets** — two, upper right
+- **Spinner** on the right orbit
+- **Slingshots** above each flipper
+- **Two flippers**, pivots at (92, 300) and (170, 300), a ~19px drain gap
+- **Outlanes and inlanes** either side
+
+### Physics
+
+Tuned rather than simulated, but anchored to real numbers so the tuning has a
+starting point that is not a guess.
+
+- Physics tick is **120 Hz**. Pinball at 60 Hz produces missed flipper contacts
+  and tunnelling through thin walls; this is the single most important setting
+  in the project.
+- Ball is a `RigidBody2D` with **cast-shape CCD** and a hard speed clamp.
+- Gravity: a real table is inclined ~6.5°, so the in-plane acceleration is
+  `g·sin(6.5°) ≈ 1.11 m/s²`. A 42" playfield mapped to 344px gives ~322 px/m,
+  so ~357 px/s². The project runs at **480 px/s²** — faster than real, because
+  a faithful table feels sluggish on a screen.
+- Flippers are `AnimatableBody2D` with `sync_to_physics`, sweeping 60° in ~48ms.
+  Kinematic bodies transfer momentum through the physics server, so the ball is
+  launched by the flipper's actual motion rather than by a scripted impulse.
+- Restitution is low on walls (0.25) and high on rubbers (0.75), which is what
+  makes slingshots and bumpers read as *live* against a dead outer wall.
+
+## Look and sound
+
+The cabinet should read as **late-80s solid-state**: dark playfield, saturated
+inserts, a segmented-LED score readout on the panel.
+
+- **Sound is real already** and fully procedural — `src/autoload/sfx.gd`
+  synthesises every effect into an `AudioStreamWAV` at boot from a
+  pitch-sweep-plus-noise generator. A solid-state cabinet's whole voice is
+  decaying tones and bursts of noise, which is about twenty lines of
+  arithmetic, and it keeps binary blobs that cannot be diffed out of the repo.
+- **Art is not pixel art yet.** Everything on the playfield is currently drawn
+  from the same `TableLayout` numbers that generate its collision, at 640×360
+  with nearest filtering. That is chunky and readable and it cannot drift out
+  of sync with the physics, which is exactly what milestone 1 needs — but it is
+  vector shapes at a low resolution, not a pixel grid.
+
+  The sprite pass (milestone 4) replaces the drawn parts with a generated
+  16-colour sheet, following `rogue-like`'s `tools/gen_pixel_art.py` approach:
+  ASCII grids and a palette in a stdlib-only Python script, so placeholder art
+  stays editable in a diff rather than in a paint program. Walls stay drawn —
+  they are generated geometry and a mod can move them.
+
+## Milestones
+
+1. **Vertical slice** — one table, real flipper feel, score/MULT, 3 balls, a
+   stage target, win/lose. *No roguelike layer.* If the flippers are not fun
+   with nothing bolted on, nothing bolted on will save them.
+2. **Run loop** — antes, blinds, tokens, shop, 6–8 relics.
+3. **Full modifier set** — table mods, target levels, all boss blinds.
+4. **Feel pass** — sound, screen shake, insert lighting, score popcorn.
+5. **Meta** — unlocks, seeded runs, daily.
+
+Milestone 1 is the gate. Everything after it is arithmetic; milestone 1 is the
+part that is actually a game.

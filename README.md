@@ -1,49 +1,162 @@
-# template
+# TILT (working title)
 
-Template repository for `ctrl-research` projects.
+An arcade **pixel-art pinball roguelike** built with **Godot 4.6.3**. One
+silver ball, a score target you have to beat with the balls you are given, and
+a machine you keep bolting things onto between rounds.
 
-## What's Included
+Balatro's run structure — escalating antes, score gates, build-defining
+relics, a shop after everything — poured into a pinball cabinet, with the
+tactile layer of *3D Pinball: Space Cadet* underneath it: flippers, plunger,
+nudge, tilt.
 
-- **Renovate** — automated dependency updates for Docker, Go modules, and GitHub Actions
-- **Branch protection** — `main` requires PRs and review
-- **CODEOWNERS** — `@ctrl-research/reviewers` auto-requested for review
-- **MIT License**
-- **.gitignore** — common exclusions for OS, IDE, build outputs, and secrets
-- **.tool-versions** — single source of truth for language/tool versions (asdf/mise compatible)
+See [docs/game-design.md](docs/game-design.md) for the full design.
 
-## Using This Template
+## Controls
 
-1. Click **Use this template** to create a new repository
-2. Pin your project's language and tool versions in `.tool-versions`
-3. Update `renovate.json` to configure managers and schedules for your project
-4. Enable the new repo in the Renovate GitHub App if using hosted Renovate
+| | |
+| --- | --- |
+| **A / D** or **← / →** | left and right flipper |
+| **SPACE** (hold, release) | plunger — how long you hold sets the power |
+| **Q / W / E** | nudge left / up / right |
+| **SPACE** | confirm, on any between-stage screen |
 
-## Renovate
+Nudging buys you back a bad bounce. The meter holds two and recharges one every
+five seconds; nudge with it empty and the machine **tilts** — flippers die, the
+ball drains, and you lose the MULT you were building.
 
-Dependency updates are managed via Renovate. Configuration is in `renovate.json` and `.github/renovate-config.js`.
+## How a run works
 
-Enabled managers:
-- `asdf` (keeps `.tool-versions` up to date)
-- `docker-compose`
-- `github-actions`
-- `gomod`
+Eight antes, three stages each: small blind, big blind, boss blind.
 
-Add or remove managers as needed for your project.
+- Each stage is a **score target** you have to beat with **3 balls**.
+- Every scoring element has a **value**; the playfield has a **MULT**. A hit
+  banks `value × MULT` immediately. MULT starts each ball at ×1, only ever
+  climbs during that ball, and is lost when the ball drains — so the ball that
+  has been alive longest is worth the most and is the one you can least afford
+  to lose.
+- Clear the stage and you are paid in tokens: the blind's reward, `$1` per
+  **unused** ball, and interest on what you are holding.
+- Spend it on **relics** (up to 5, always-on, the axis you build around),
+  **table mods** (which physically change the playfield), or **target levels**
+  (which raise the base value of a whole class of target).
+- The **boss blind** attacks the machine rather than the number — a dead
+  flipper, dead bumpers, a capped MULT, a wider drain.
 
-## Files
+Miss a target with no balls left and the run is over.
+
+## Running locally
+
+Install Godot **4.6.3** (see `.tool-versions`), then:
+
+```sh
+godot --path .            # run the game
+godot --path . --editor   # open the editor
+```
+
+Tests, the same two CI runs:
+
+```sh
+godot --headless --path . tests/run_test.tscn                          # expect RUN_TEST_OK
+godot --headless --path . --quit-after 5000 tests/headless_sim.tscn    # expect SIM_OK
+```
+
+### Seeing the playfield without opening the editor
+
+The table is generated — offset polylines, a computed arch, a mirrored bottom
+half — so reading `layout.gd` tells you much less than looking at the result,
+and a table mod or a boss blind reshapes it. This renders what the game will
+actually build:
+
+```sh
+godot --headless --path . tools/dump_layout.tscn > /tmp/layout.json
+python3 tools/preview_table.py /tmp/layout.json table.png
+```
+
+It draws each flipper twice — at rest and at full sweep — because the swept
+volume is where ball traps hide. Both traps found so far were visible in this
+picture before they were understood in the code.
+
+## How the project is put together
+
+**The table is data, not a scene.** Every wall, target and lane lives in
+`src/table/layout.gd` as plain numbers; `table.gd` turns them into collision
+shapes and draws them from the same source. Nothing is hand-placed in a `.tscn`
+— the scene files are a root node and a script.
+
+That is not tidiness. Table mods are a core roguelike axis here ("Extra
+Bumper", "Wide Flippers", "Outlane Guards"), and a mod is only cheap to build
+if the playfield is a *value* you can edit before instantiating it. It also
+means collision and rendering cannot drift apart.
+
+**The table decides nothing.** It reports what was hit; `run.gd` owns every
+number. A relic is a branch at a named hook in one file rather than a patch
+threaded through a dozen playfield scripts.
 
 ```
-.
-├── .github/
-│   ├── CODEOWNERS           # Auto-request review from @ctrl-research/reviewers
-│   ├── renovate-config.js   # Renovate platform config
-│   └── workflows/
-│       └── renovate.yaml    # Renovate GitHub Action workflow
-├── .gitignore
-├── .tool-versions          # Pinned language/tool versions (asdf/mise)
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-├── renovate.json           # Renovate settings
-└── SECURITY.md
+src/
+├── autoload/
+│   ├── run.gd        # run state + all scoring arithmetic (autoload "Run")
+│   └── sfx.gd        # procedural audio, synthesised at boot (autoload "Sfx")
+├── run/catalog.gd    # relics, mods, bosses, blind curve -- data only
+├── table/
+│   ├── layout.gd     # the machine, as numbers
+│   ├── table.gd      # builds it; plunger, nudge, drain, boss hazards
+│   ├── ball.gd  flipper.gd  bumper.gd  slingshot.gd  target.gd  sensor.gd
+├── ui/hud.gd         # panel + every between-stage screen, built in code
+├── game.gd           # the run as a state machine
+└── main_menu.gd
 ```
+
+### Physics notes
+
+- **120Hz physics.** The single most important setting in the project. At 60Hz
+  a ball at 600px/s advances 10px per tick — wider than the ball and comparable
+  to a wall's thickness, so contacts are missed and flipper sweeps pass through.
+- **Flippers are `AnimatableBody2D` with `sync_to_physics`**, not rigid bodies
+  on motorised joints and not scripted impulses. The physics server turns the
+  body's transform change into a velocity, so the ball is launched by the
+  flipper's actual motion — which is why a ball caught near the tip flies
+  further than one caught at the root, and why cradling works at all.
+- **Gravity is 480px/s².** A real table inclined 6.5° works out to ~357px/s² at
+  this scale; we run faster than real because a faithful table feels sluggish
+  on a screen.
+- **Restitution is per-surface**: 0.25 on outer walls, 0.75 on slingshot
+  rubbers. The ball itself is dead (0.0) and Godot combines by taking the
+  maximum, so a bouncy ball would make the whole table one uniform trampoline.
+
+## Status
+
+Milestone 1 (vertical slice) and most of milestone 2 (the run loop) are in:
+one table, the full 8-ante structure, 14 relics, 4 table mods, 8 boss blinds,
+target levels, and the shop.
+
+It has been run: both tests pass under Godot 4.6.3, and the web export has been
+loaded in a browser through the menu, a blind intro, a plunge and a ball in
+play. Along the way that testing found and fixed four real bugs — two ball
+traps that made the table unable to drain, a plunger that ignored a tap, and a
+menu that could start two runs at once.
+
+Known gaps, in the order they matter:
+
+1. **No human has played it.** Everything above is a bot and a screenshot,
+   which proves the table *works* and says nothing about whether it is *fun*.
+   Flipper sweep, plunge power, slingshot kick, gravity and the drain gap are
+   reasoned from real-machine numbers, not tuned by feel. Expect the first real
+   session to be a tuning pass; the constants that matter are all at the top of
+   `layout.gd`.
+2. **It is not pixel art yet.** The playfield is drawn from its own collision
+   geometry, which is chunky and readable and guaranteed in sync, but it is
+   low-res vector shapes rather than a pixel grid. See the design doc's
+   milestone 4.
+3. **The table is sparse.** Three bumpers, three drop targets, two standups,
+   two rollovers, a spinner. Enough to prove the scoring engine, thin for a
+   machine you are meant to learn by heart.
+4. One table. Variety currently comes from mods and relics only.
+
+## CI
+
+`.github/workflows/build.yml` runs on every PR: imports the project, runs the
+scoring unit test and a headless bot that plays the real scene, exports the web
+build, and greps the log for parse and autoload errors — a Godot export exits 0
+even when scripts fail to compile, so a successful export is not on its own
+evidence the project is healthy. `main` additionally deploys to GitHub Pages.
