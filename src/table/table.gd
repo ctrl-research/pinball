@@ -30,6 +30,18 @@ const SHAKE_DECAY := 9.0
 const WARP_PERIOD := 3.0
 const DROP_RESET_DELAY := 0.8
 
+## Anything outside this is not a ball in play. Generous on every side: real
+## play reaches y~10 at the arch, y~344 at the drain and x~270 in the lane.
+##
+## This is a backstop, not the containment. The geometry is what keeps the ball
+## in, and tests/containment_test.tscn is what proves it -- but no amount of
+## testing proves there is no hole left, and the failure this guards against is
+## the worst one the game has: a ball that leaves the cabinet never drains, so
+## the stage never ends and the run cannot even be lost. Costing the player a
+## ball is a bad outcome. Costing them the run with no way to act is not an
+## outcome at all.
+const PLAY_BOUNDS := Rect2(-24.0, -40.0, 328.0, 420.0)
+
 var balls: Array[Ball] = []
 var home_position := Vector2.ZERO
 var active := false
@@ -108,9 +120,11 @@ func _build_walls() -> void:
 	body.physics_material_override = mat
 	for line in _wall_lines:
 		# Strokes the centreline into a closed ribbon with rounded caps, so a
-		# ball cannot catch on a wall's square end.
+		# ball cannot catch on a wall's square end. Thickness is per-wall: the
+		# arch is collided with far deeper than it is drawn.
 		var shapes := Geometry2D.offset_polyline(
-			line, TableLayout.WALL_THICKNESS * 0.5, Geometry2D.JOIN_ROUND, Geometry2D.END_ROUND)
+			line, TableLayout.WALL_THICKNESS * 0.5,
+			Geometry2D.JOIN_ROUND, Geometry2D.END_ROUND)
 		for poly in shapes:
 			var cp := CollisionPolygon2D.new()
 			cp.polygon = poly
@@ -118,6 +132,11 @@ func _build_walls() -> void:
 	# Filled regions go in as-is. CollisionPolygon2D decomposes a concave
 	# polygon into convex pieces itself, which is what the divider wedge needs.
 	for poly in _solid_polys:
+		var cp := CollisionPolygon2D.new()
+		cp.polygon = poly
+		body.add_child(cp)
+	# Collided with, never drawn: the cap behind the arch.
+	for poly in TableLayout.hidden_solids():
 		var cp := CollisionPolygon2D.new()
 		cp.polygon = poly
 		body.add_child(cp)
@@ -349,6 +368,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_track_balls()
+	_catch_escapees()
 	_update_plunger(delta)
 	_update_gate(delta)
 	_update_warp(delta)
@@ -370,6 +390,30 @@ func _track_balls() -> void:
 				break
 		if in_outlane:
 			b.set_meta("via_outlane", true)
+
+
+## Sweeps up any ball that has left the table, as if it had drained.
+func _catch_escapees() -> void:
+	for b in balls.duplicate():
+		if not is_instance_valid(b):
+			balls.erase(b)
+			continue
+		if PLAY_BOUNDS.has_point(b.position):
+			continue
+		push_warning("ball escaped the table at %s -- treating it as drained"
+			% b.position.round())
+		_retire_ball(b, false)
+
+
+## Removes a ball from play, ending the ball if it was the last one out.
+func _retire_ball(b: Ball, via_outlane: bool) -> void:
+	balls.erase(b)
+	b.queue_free()
+	# Deferred because this runs inside the physics server's query flush: the
+	# listener re-serves a ball, and building one adds collision shapes to a new
+	# body, which the server refuses to do mid-flush.
+	if balls.is_empty():
+		drained.emit.call_deferred(via_outlane)
 
 
 func _update_plunger(delta: float) -> void:
@@ -466,17 +510,9 @@ func _on_drain(body: Node) -> void:
 	if not (body is Ball):
 		return
 	var b := body as Ball
-	var via_outlane: bool = b.get_meta("via_outlane", false)
-	balls.erase(b)
-	b.queue_free()
 	Sfx.play("drain")
 	# Multiball: only the last ball leaving the playfield ends the ball.
-	#
-	# Emitted deferred because this runs inside the physics server's query
-	# flush: the listener re-serves a ball, and building one adds collision
-	# shapes to a new body, which the server refuses to do mid-flush.
-	if balls.is_empty():
-		drained.emit.call_deferred(via_outlane)
+	_retire_ball(b, b.get_meta("via_outlane", false))
 
 
 func _on_scored(points: int, at: Vector2) -> void:
@@ -524,10 +560,13 @@ func _draw() -> void:
 	# near one's top face still covers the far one's side.
 	for poly in _solid_polys:
 		draw_colored_polygon(TableLayout.shift(poly, TableLayout.WALL_EXTRUDE), WALL_SIDE)
-	for line in _wall_lines:
+	# The arch is drawn from its own line: its collision is the solid cap behind
+	# it, which has no centreline to stroke.
+	var arch := TableLayout.arch_polyline()
+	for line in _wall_lines + [arch]:
 		draw_polyline(TableLayout.shift(line, TableLayout.WALL_EXTRUDE),
 			WALL_SIDE, TableLayout.WALL_THICKNESS)
-	for line in _wall_lines:
+	for line in _wall_lines + [arch]:
 		draw_polyline(line, WALL_COLOUR, TableLayout.WALL_THICKNESS)
 	for poly in _solid_polys:
 		draw_colored_polygon(poly, SOLID_COLOUR)

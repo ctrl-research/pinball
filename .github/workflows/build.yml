@@ -72,6 +72,16 @@ jobs:
           ./godot --headless --path . --quit-after 3000 tests/inlane_test.tscn 2>&1 | tee -a build.log
           grep -q "INLANE_TEST_OK" build.log
 
+      # Fires a ball at every wall from every angle at the speed clamp, with the
+      # flippers hammering. A ball that leaves the cabinet never drains, so the
+      # stage never ends and the run cannot even be lost -- the worst failure
+      # the game has, and one the bot finds only by luck.
+      - name: Ball containment test
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . --quit-after 60000 tests/containment_test.tscn 2>&1 | tee -a build.log
+          grep -q "CONTAINMENT_OK" build.log
+
       # A bot playing the real scene: physics, state machine and HUD. Asserts a
       # floor on what it reaches (a ball served, a point scored, the shop
       # opened) so losing coverage fails the build instead of quietly passing.

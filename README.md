@@ -68,6 +68,8 @@ Tests, the same two CI runs:
 
 ```sh
 godot --headless --path . tests/run_test.tscn                          # expect RUN_TEST_OK
+godot --headless --path . --quit-after 3000 tests/inlane_test.tscn     # expect INLANE_TEST_OK
+godot --headless --path . --quit-after 60000 tests/containment_test.tscn  # expect CONTAINMENT_OK
 godot --headless --path . --quit-after 5000 tests/headless_sim.tscn    # expect SIM_OK
 ```
 
