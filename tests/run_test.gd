@@ -25,6 +25,7 @@ func _ready() -> void:
 	_stage_completion()
 	_inventory()
 	_consumables()
+	_slow_ball()
 
 	if _failures > 0:
 		push_error("RUN_TEST_FAILED: %d check(s)" % _failures)
@@ -274,7 +275,17 @@ func _inventory() -> void:
 	_eq(Run.add_consumable("ball_polish"), true, "a consumable fits")
 	_eq(Run.add_consumable("ball_polish"), true, "and duplicates are allowed")
 	_eq(Run.add_consumable("overclock"), true, "three consumables fit")
-	_check(not Run.add_consumable("heavy_ball"), "the fourth consumable is refused")
+	_check(not Run.add_consumable("slow_ball"), "the fourth consumable is refused")
+	_eq(Run.consumable_count(), 3, "three are held")
+
+	# Slots are fixed: firing one leaves a hole rather than shuffling.
+	_check(Run.use_consumable(0), "slot 1 fires")
+	_eq(Run.consumables[0], "", "and leaves slot 1 empty")
+	_eq(Run.consumables[2], "overclock", "without moving slot 3")
+	_check(not Run.use_consumable(0), "so slot 1 cannot fire twice")
+	_eq(Run.consumable_count(), 2, "two are left")
+	_check(Run.add_consumable("surge"), "and a new one refills the hole")
+	_eq(Run.consumables[0], "surge", "in slot 1")
 
 	# Selling returns 75% of shelf price, rounded down.
 	_eq(Catalog.sell_price("trinket", "brass_bumper"), 3, "a $4 trinket sells for $3")
@@ -303,43 +314,58 @@ func _inventory() -> void:
 		"duplicated trinkets are refused")
 
 
-## Consumables are stage-scoped, and spending one removes it.
+## Consumables are fired mid-ball and most of them run on a real-time clock.
 func _consumables() -> void:
 	Run.new_run(1032)
 	Run.add_consumable("ball_polish")
-	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "unspent, it does nothing")
-	_check(Run.use_consumable(0), "it can be spent")
-	_eq(Run.consumables.size(), 0, "and is gone afterwards")
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "unfired, it does nothing")
+	_check(Run.use_consumable(0), "it can be fired")
+	_eq(Run.consumable_count(), 0, "and leaves the rack afterwards")
+	_check(Run.effect_active("ball_polish"), "the effect is running")
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 20, "Ball Polish doubles values")
+	_check(Run.effect_remaining("ball_polish") > 15.0, "with time left on it")
 
-	# ...and only for this stage.
+	# Effects do not survive the stage.
 	Run.blind = Catalog.BIG
 	Run.begin_stage()
-	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "the effect does not survive the stage")
+	_check(not Run.effect_active("ball_polish"), "a new stage clears the effect")
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "so values are back to normal")
 
+	# Expiry is driven by the real clock, so a zero-length effect is already over.
+	Run.new_run(1038)
+	Run.effects["ball_polish"] = Time.get_ticks_msec() - 1
+	_check(Run.effect_active("ball_polish"), "an expired effect is still listed...")
+	Run._expire_effects()
+	_check(not Run.effect_active("ball_polish"), "...until it is swept")
+
+	# Instants.
 	Run.new_run(1033)
 	Run.add_consumable("extra_ball")
 	var balls := Run.balls_left
 	Run.use_consumable(0)
 	_eq(Run.balls_left, balls + 1, "Extra Ball is a resource, granted immediately")
+	_check(not Run.effect_active("extra_ball"), "and starts no timer")
 
 	Run.new_run(1034)
-	Run.add_consumable("loaded_plunger")
+	Run.add_consumable("surge")
 	Run.use_consumable(0)
-	Run.begin_ball()
-	_eq(Run.mult, 3.0, "Loaded Plunger starts each ball at x3")
-
-	Run.new_run(1035)
-	_eq(Run.ball_radius_scale(), 1.0, "the ball is normally normal-sized")
-	Run.add_consumable("heavy_ball")
+	_eq(Run.mult, 3.0, "Surge lifts MULT to x3 at once")
+	Run.new_run(1039)
+	Run.add_mult(4.0)  # MULT x5, already above the floor
+	Run.add_consumable("surge")
 	Run.use_consumable(0)
-	_eq(Run.ball_radius_scale(), 2.0, "Heavy Ball doubles it")
+	_eq(Run.mult, 5.0, "and never lowers a MULT that is already higher")
 
 	Run.new_run(1036)
 	Run.add_consumable("overclock")
 	Run.use_consumable(0)
 	Run.add_mult(1.0)
 	_eq(Run.mult, 3.0, "Overclock doubles MULT gains")
+
+	Run.new_run(1040)
+	Run.add_consumable("jackpot_charge")
+	Run.use_consumable(0)
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 510, "Jackpot Charge adds a flat 500")
 
 	Run.new_run(1037)
 	Run.add_consumable("second_wind")
@@ -349,4 +375,25 @@ func _consumables() -> void:
 	_eq(Run.balls_left, had, "at no cost")
 	_check(not Run.consume_ball(false), "but only once")
 
-	_check(not Run.use_consumable(0), "spending nothing fails cleanly")
+	# Refiring restarts rather than stacks.
+	Run.new_run(1041)
+	Run.add_consumable("ball_polish")
+	Run.add_consumable("ball_polish")
+	Run.use_consumable(0)
+	Run.use_consumable(0)
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 20, "two Ball Polish is still x2, not x4")
+
+	_check(not Run.use_consumable(0), "firing nothing fails cleanly")
+
+
+## Slow Ball drives Engine.time_scale, and a leaked time scale would slow the
+## whole game down forever -- so the derivation is what is checked, not the use.
+func _slow_ball() -> void:
+	Run.new_run(1042)
+	Run.add_consumable("slow_ball")
+	Run.use_consumable(0)
+	_check(Run.effect_active("slow_ball"), "Slow Ball is running")
+	_check(Run.effect_remaining("slow_ball") <= 6.0, "for no more than its 6s")
+
+	Run.begin_stage()
+	_check(not Run.effect_active("slow_ball"), "and a new stage ends it")

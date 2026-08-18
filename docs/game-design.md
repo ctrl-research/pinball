@@ -315,37 +315,52 @@ genuinely harder to hold. Not every coil should be a straight upgrade.
 ### Consumables
 
 One-shot items, held **up to three** at a time, bought and sold in the shop and
-spent on the stage intro screen. Their effects last exactly one stage.
+fired **mid-ball with the 1-3 keys**. Most run on a timer and then stop.
 
-Trinkets are the build and change slowly; consumables are the answer to "I need
-*this* stage to go differently". That makes them the only part of the economy
-spent reactively — you buy a trinket because of what your run is becoming, and a
-consumable because of the boss you have just been dealt.
+That timing is the whole design. A consumable spent on a menu is just a slower
+shop purchase; a consumable spent with the ball live is a read — pop Ball Polish
+now, or hold it in case this ball reaches the bumpers? An earlier version had
+these chosen on the stage intro screen, and it was exactly the boring version of
+this.
 
 | Consumable | Effect | Cost |
 | --- | --- | --- |
-| Steady Hand | Nudges recharge 3× faster | `$3` |
-| Ball Polish | All values ×2 | `$5` |
-| Second Wind | The first drain returns the ball | `$5` |
-| Jackpot Charge | The first hit of each ball scores ×10 | `$5` |
+| Steady Hand | 30s: nudges recharge 3× faster | `$3` |
+| Ball Polish | 20s: all values ×2 | `$5` |
+| Second Wind | 30s: a drain returns the ball | `$5` |
+| Jackpot Charge | 12s: every hit also pays a flat 500 | `$5` |
+| Overclock | 20s: MULT gains are doubled | `$6` |
+| Surge | MULT jumps to at least ×3, now | `$6` |
 | Extra Ball | One more ball this stage | `$6` |
-| Loaded Plunger | Every ball starts at MULT ×3 | `$6` |
-| Overclock | MULT gains are doubled | `$6` |
-| Heavy Ball | The ball is twice the size | `$7` |
+| Slow Ball | 6s: everything runs at 55% speed | `$7` |
 
-**Stage-scoped rather than per-ball.** An earlier draft had these chosen before
-each plunge, which is a better decision in the abstract and three interruptions
-a stage in practice. One choice at the intro, made while looking at the boss you
-have drawn, is the same decision with none of the friction.
+The strongest are the shortest. `Slow Ball` is the one the scheme was worth
+building for: slowing time is the most powerful thing you can hand a player in a
+real-time game, so six seconds is enough to save one ball you had already lost
+and not enough to play the game in.
 
-`Heavy Ball` is the clearest thing the playfield-as-data buys us. Doubling the
-radius is one number, and the consequences are entirely geometric and entirely
-honest: an 18px drain gap will not pass a 16px ball, and neither will an 11px
-outlane or a 22px orbit. It protects you and locks you out of half the table in
-the same stroke, and nobody had to write a rule saying so.
+**Slots are fixed, not a list that closes up.** Firing slot 1 leaves slot 1
+empty rather than sliding slot 2 down into it. These are bound to keys and fired
+under pressure — if the rack shuffled, a panicked double-tap would burn two
+items, and "my Slow Ball is 2" would never become muscle memory. A hole is the
+price of a stable binding.
 
 Duplicates are allowed, unlike trinkets — holding two Ball Polish is a
-legitimate thing to want, and holding two of the same trinket is not.
+legitimate thing to want, and holding two of the same trinket is not. Refiring
+an effect that is already running restarts its timer rather than stacking,
+because two overlapping Ball Polish would be ×4 and nothing in the shop says so.
+
+#### Why Heavy Ball is not here
+
+An earlier draft had a consumable that doubled the ball's radius, and it was the
+best illustration of what the playfield-as-data buys: one number, and an 18px
+drain gap will not pass a 16px ball.
+
+It cannot survive being fired mid-ball. The ball is frequently *inside* an 11px
+outlane or a 22px orbit, and growing a collision shape inside solid geometry
+either ejects it violently or wedges it. The idea is sound and the timing is
+not, so it belongs to a layer that applies between balls — a table mod, or a
+coil — and it is parked there rather than dropped.
 
 ### The shop
 

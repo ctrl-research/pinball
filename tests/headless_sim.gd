@@ -9,6 +9,11 @@ extends Node
 ##
 ## Prints SIM_OK only if every floor below is met, so losing coverage fails the
 ## build instead of quietly passing.
+##
+## Note that frame counts here are NOT comparable across machines. Consumable
+## effects expire on real time, and headless frames run as fast as the box
+## allows, so the same seed covers a different number of seconds on CI than it
+## does locally. Anything this test asserts has to tolerate that.
 
 const GAME := preload("res://scenes/game.tscn")
 
@@ -30,6 +35,15 @@ const FORCE_CLEAR_FRAME := 1200
 ## forced stage to its end; the second is what the drain assertion rests on.
 const NO_FLIP_WINDOWS := [[1200, 1950], [2700, TOTAL_FRAMES]]
 
+## Where the bot is handed a consumable and told to press 1. The keybind path
+## runs through game.gd's input polling, which no unit test can reach.
+## The sim is handed a consumable no earlier than this, then fires it over the
+## following frames. Deliberately "no earlier than" rather than "on": whether
+## the game is in PLAYING at any exact frame is not something this test can
+## know, and an earlier version that keyed off exact frames simply skipped the
+## whole check when the timing shifted.
+const CONSUMABLE_FRAME := 700
+
 const PLUNGE_HOLD := 120
 const FLIP_PERIOD := 8
 
@@ -47,6 +61,9 @@ var _drains := 0
 var _last_ball_id := 0
 var _states_seen := {}
 var _forced := false
+var _fired_consumable := false
+var _consumable_step := 0
+var _ended_in := -1
 
 
 func _ready() -> void:
@@ -68,7 +85,20 @@ func _process(_delta: float) -> void:
 	if _frame % TRACE_EVERY == 0:
 		_trace()
 
+	# A finished run is where the sim stops, not something to click through.
+	# Confirming on the defeat screen changes scene to the main menu -- and
+	# because the sim *is* the current scene, that frees the sim itself
+	# mid-frame: no summary, no verdict, and a silent pass until --quit-after.
+	# It cost a red CI run to find, and the seed alone never showed it because
+	# whether the bot loses depends on how fast the machine runs frames.
+	if _game.state == Game.State.LOST or _game.state == Game.State.WON:
+		_ended_in = _game.state
+		_finish()
+		return
+
 	if _game.state == Game.State.PLAYING:
+		if _frame >= CONSUMABLE_FRAME:
+			_advance_consumable()
 		if _frame == FORCE_CLEAR_FRAME and not _forced:
 			_forced = true
 			_score_before_force = Run.score
@@ -89,6 +119,21 @@ func _process(_delta: float) -> void:
 
 	if _frame >= TOTAL_FRAMES:
 		_finish()
+
+
+## One step per frame, so it cannot matter which frame PLAYING starts on.
+func _advance_consumable() -> void:
+	match _consumable_step:
+		0:
+			Run.add_consumable("ball_polish")
+		1:
+			Input.action_press("use_consumable_1")
+		2:
+			Input.action_release("use_consumable_1")
+			_fired_consumable = Run.effect_active("ball_polish")
+		_:
+			return
+	_consumable_step += 1
 
 
 func _play() -> void:
@@ -170,15 +215,17 @@ func _finish() -> void:
 		problems.append("the bot never scored a point -- nothing on the table is reachable")
 	if _balls_served < 2:
 		problems.append("only %d ball(s) were served" % _balls_served)
+	if not _fired_consumable:
+		problems.append("pressing 1 did not fire a consumable")
 	if _drains < 1:
 		problems.append("no ball drained even with hands-off windows %s" % [NO_FLIP_WINDOWS])
 	for required in [Game.State.INTRO, Game.State.PLAYING, Game.State.SHOP]:
 		if not _states_seen.has(required):
 			problems.append("never reached state %d" % required)
 
-	print("SIM: frames=%d score_max=%d organic_score=%d balls=%d drains=%d states=%s"
+	print("SIM: frames=%d score_max=%d organic_score=%d balls=%d drains=%d consumable=%s ended_in=%d states=%s"
 		% [_frame, _max_score, _score_before_force, _balls_served, _drains,
-			_states_seen.keys()])
+			_fired_consumable, _ended_in, _states_seen.keys()])
 	if problems.is_empty():
 		print("SIM_OK")
 		get_tree().quit(0)

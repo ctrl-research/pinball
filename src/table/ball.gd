@@ -5,11 +5,7 @@ extends RigidBody2D
 ## Deliberately dumb: it knows how to not tunnel and how to not get stuck, and
 ## nothing at all about scoring. Everything it touches reports the hit itself.
 
-## Not a constant any more: Heavy Ball doubles it for a stage, and the whole
-## point of that consumable is that the consequences are geometric -- a ball
-## this size does not fit through the drain gap, and does not fit down an
-## outlane or an orbit either.
-var radius := TableLayout.BALL_RADIUS
+const RADIUS := TableLayout.BALL_RADIUS
 
 ## Hard speed ceiling. At 120Hz a ball at 900px/s advances 7.5px per tick,
 ## which is just under its own diameter -- so together with cast-shape CCD it
@@ -53,10 +49,9 @@ func _ready() -> void:
 	collision_layer = 2
 	collision_mask = 1 | 2  # walls, and other balls during multiball
 
-	radius = TableLayout.BALL_RADIUS * Run.ball_radius_scale()
 	var shape := CollisionShape2D.new()
 	var circle := CircleShape2D.new()
-	circle.radius = radius
+	circle.radius = RADIUS
 	shape.shape = circle
 	add_child(shape)
 
@@ -85,11 +80,10 @@ func _draw() -> void:
 	# separates a ball resting *on* the playfield from a disc painted on it,
 	# and it is the only thing that makes a ball airborne off a slingshot read
 	# as airborne.
-	draw_circle(TableLayout.BALL_SHADOW, radius * 0.95, Color(0.0, 0.0, 0.0, 0.45))
+	draw_circle(TableLayout.BALL_SHADOW, RADIUS * 0.95, Color(0.0, 0.0, 0.0, 0.45))
 
 	# Drawn rather than sprited so the ball scales cleanly with the layout
 	# constants; the highlight is what sells it as a chrome sphere at 8px.
-	draw_circle(Vector2.ZERO, radius, Color(0.78, 0.80, 0.86))
-	draw_circle(Vector2(-1.2, -1.2) * (radius / TableLayout.BALL_RADIUS),
-		radius * 0.45, Color(0.96, 0.97, 1.0))
-	draw_arc(Vector2.ZERO, radius - 0.5, 0.5, 2.4, 8, Color(0.36, 0.38, 0.46), 1.0)
+	draw_circle(Vector2.ZERO, RADIUS, Color(0.78, 0.80, 0.86))
+	draw_circle(Vector2(-1.2, -1.2), RADIUS * 0.45, Color(0.96, 0.97, 1.0))
+	draw_arc(Vector2.ZERO, RADIUS - 0.5, 0.5, 2.4, 8, Color(0.36, 0.38, 0.46), 1.0)

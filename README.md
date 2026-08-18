@@ -19,6 +19,7 @@ See [docs/game-design.md](docs/game-design.md) for the full design and
 | **A / D** or **← / →** | left and right flipper |
 | **SPACE** (hold, release) | plunger — how long you hold sets the power |
 | **Q / W / E** | nudge left / up / right |
+| **1 / 2 / 3** | fire the consumable in that slot |
 | **SPACE** | confirm, on any between-stage screen |
 
 Nudging buys you back a bad bounce. The meter holds two and recharges one every
@@ -42,8 +43,8 @@ Eight antes, three stages each: small blind, big blind, boss blind.
   how many times over you beat the target (capped ×5), `$1` per ball you never
   needed, and interest on what you are holding.
 - Spend it on **trinkets** (up to 5, always-on, the axis you build around),
-  **consumables** (up to 3, one-shot, spent at a stage intro and lasting that
-  stage),
+  **consumables** (up to 3, one-shot, fired mid-ball with the 1-3 keys and
+  mostly running on a timer),
   **table mods** (which physically change the playfield), or **target levels**
   (which raise the base value of a whole class of target).
 - The **boss blind** attacks the machine rather than the number — a dead
