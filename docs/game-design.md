@@ -25,28 +25,76 @@ is chips × mult, and it is native vocabulary here — no reskinning required.
 
 ## The screen
 
-Portrait table on the left, panel on the right — the *Space Cadet* arrangement,
-and the panel is where the roguelike lives.
+The machine is centred and drawn as a machine: a backbox above the playfield, a
+lockdown bar at the near edge, and rails down both sides that converge with the
+playfield as it recedes. A panel brackets it on each side.
 
 ```
  640 x 360 viewport
-┌──────────────────┬──────────────────────────────────┐
-│                  │  ANTE 3      BOSS · THE GOVERNOR │
-│    ╭──────╮      │  ┌────┐┌────┐┌────┐┌────┐┌────┐  │
-│   │  ◉ ◉   │     │  │BRAS││COMB││BALL││    ││    │  │  ← relic row
-│   │   ◉    │     │  └────┘└────┘└────┘└────┘└────┘  │
-│   │ ▬▬▬    │     │                                  │
-│   │        │     │      SCORE   12,480 / 20,000     │
-│   │        │     │                                  │
-│   │ ◣    ◢ │     │      VALUE  120  ×  MULT 4.0     │
-│   │  \  /  │     │                                  │
-│    ╰──────╯      │   BALLS ●●○      NUDGE ▮▮○   $14 │
-└──────────────────┴──────────────────────────────────┘
+┌────────────────┬────────────────────────┬────────────────┐
+│ POWER-UPS      │   ┌────────────────┐   │ SCORE          │
+│ ┌────────────┐ │   │  ANTE 3 / 8    │   │ 12,480         │
+│ │BRASS BUMPER│ │   │  BOSS BLIND    │   │ TARGET  20,000 │
+│ ├────────────┤ │   └────────────────┘   │ ▓▓▓▓▓▓░░░░░░░  │
+│ │COMBO COIL  │ │      ___________       │                │
+│ ├────────────┤ │     /  ▁▁    ▁▁  \     │ BALLS   ***    │
+│ │BALL SAVER  │ │    /  (◉)   (◉)   \    │ NUDGE   **     │
+│ ├────────────┤ │   │        ▁▁       │  │ $14            │
+│ │            │ │   │       (◉)       │  │                │
+│ ├────────────┤ │   │                 │  │                │
+│ │            │ │   │    ◣▁     ▁◢    │  │                │
+│ └────────────┘ │   └─────────────────┘  │ A / D flippers │
+│ MULTIPLIER     │   ═══ lockdown bar ═══ │ SPACE plunge   │
+│ x4             │                        │ Q / W / E nudge│
+└────────────────┴────────────────────────┴────────────────┘
 ```
 
-The table occupies x ∈ [16, 296]; the panel owns the rest. Base resolution is
-640×360 with `canvas_items` stretch and nearest-neighbour filtering, so the
-pixel grid survives any window size — same setup as `rogue-like`.
+The split follows what the player is asking at the time. **Left is what they
+have** — the relics and the MULT those relics are feeding. It is the build, and
+it changes slowly. **Right is where they are** — score against target, balls,
+nudges, money, all of which move while the ball is alive. Putting a number that
+changes every frame next to one that almost never does trains you to stop
+reading either.
+
+Ante and blind live in the **backbox**, because that is what a backbox is for
+and it sits above the playfield where the player is already looking.
+
+Base resolution is 640×360 with `canvas_items` stretch, so the layout survives
+any window size — same setup as `rogue-like`.
+
+### 2.5D
+
+The playfield is rendered flat into a SubViewport and warped onto a trapezoid by
+`src/ui/perspective.gdshader`: full width at the near edge, narrower and
+vertically compressed as it recedes.
+
+Doing it at the last step before the screen, rather than in the drawing code, is
+the point. **The simulation stays a plain top-down 2D world that has never heard
+of perspective**, so no ball can ever behave differently because of how it is
+being drawn — which is the one property a pinball game cannot afford to lose.
+It also means every part gets foreshortened for free, including the extrusions
+below.
+
+The warp is *projective*, not a linear squash. A linear trapezoid reads as a
+picture someone has skewed; dividing the vertical coordinate by the same
+interpolant that narrows each row is what makes the far end compress and the
+near end stretch, and that is the part the eye reads as depth.
+
+On top of that, every solid part is drawn twice — a dark side face offset toward
+the player, then the lit top face over it. Because the camera is at the near
+edge, the only side face you can ever see is the near one, so the offset is
+always +y and never needs to know about the part's shape. Lamp inserts
+deliberately get no side face: they are flush with the wood, and half of what
+sells everything else as raised is that these are not.
+
+The ball's cast shadow is the cheapest depth cue on the table and the one doing
+the most work — it is what separates a ball resting *on* the playfield from a
+disc painted on it, and the only thing that makes a ball airborne off a
+slingshot read as airborne.
+
+**The trade**: foreshortening shrinks the bumper cluster exactly where a lot of
+the scoring happens. If it ever costs readability, `Cabinet.TOP_SCALE` is the
+number that gives, not the layout.
 
 ## The run
 

@@ -188,6 +188,33 @@ const DRAIN_Y := HEIGHT
 const CHUTE_OVERRUN := 6.0
 
 
+# --- Presentation -------------------------------------------------------------
+
+## Every solid part is drawn twice: a dark side face offset toward the player,
+## then the lit top face over it. In a top-down view with the camera at the near
+## edge, the only side face you can see is the near one, so the offset is +y.
+##
+## These are in flat playfield pixels, before the perspective warp -- which
+## means a part near the far end has its extrusion foreshortened along with
+## everything else, for free. That is the payoff for warping the finished image
+## rather than the drawing code.
+const EXTRUDE := 3.0
+const WALL_EXTRUDE := 2.5
+const BALL_SHADOW := Vector2(1.5, 3.0)
+
+## Lamp inserts are flush with the playfield and deliberately get no side face.
+## Giving them one would make them read as blocks standing on the wood, and
+## half of what sells the rest as raised is that these are not.
+
+
+## A polyline shifted toward the player, for drawing a part's side face.
+static func shift(pts: PackedVector2Array, dy: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for p in pts:
+		out.append(p + Vector2(0.0, dy))
+	return out
+
+
 # --- Derived geometry ---------------------------------------------------------
 
 

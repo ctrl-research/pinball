@@ -6,8 +6,9 @@
 structure (antes, score-gated blinds, relics, a shop) on a real pinball
 playfield. Exports to web and deploys to GitHub Pages.
 
-Design lives in [docs/game-design.md](docs/game-design.md); how the code is
-arranged is in [README.md](README.md).
+Design lives in [docs/game-design.md](docs/game-design.md), build order in
+[docs/roadmap.md](docs/roadmap.md), and how the code is arranged in
+[README.md](README.md).
 
 ## Tech stack
 
@@ -30,7 +31,9 @@ arranged is in [README.md](README.md).
 │   ├── run/catalog.gd       # relics, mods, bosses, blind curve -- data only
 │   ├── table/layout.gd      # the machine, as numbers
 │   ├── table/*.gd           # table build + individual playfield parts
-│   ├── ui/hud.gd            # panel + between-stage screens, built in code
+│   ├── ui/cabinet.gd        # rails, lockdown, backbox + screen layout
+│   ├── ui/perspective.gdshader  # the trapezoid warp
+│   ├── ui/hud.gd            # both panels + between-stage screens
 │   ├── game.gd              # the run as a state machine
 │   └── main_menu.gd
 ├── tests/
@@ -58,6 +61,17 @@ arranged is in [README.md](README.md).
   data entry in `catalog.gd` plus a branch at a named hook in `run.gd` — if a
   relic needs a change in `table.gd`, it is a *table mod*, not a relic.
 - **Scene files stay trivial** — a root node and a script. UI is built in code.
+- **Perspective is a rendering step, never a simulation one.** The playfield
+  renders flat into `Cabinet`'s SubViewport and is warped by a shader on the way
+  to the screen. Never let a gameplay value depend on a screen position: if the
+  physics ever needs to know where something is *drawn*, the design is wrong.
+- **Screen layout lives in `cabinet.gd`.** Panels are positioned relative to the
+  machine, so there is one source for it. `Cabinet.TOP_SCALE` is shared with the
+  shader and the two must agree, or the rails stop lining up with the playfield.
+- **Building a Label in code: set `autowrap_mode` before `size`.** A Label grows
+  to its own minimum size, and an unwrapped Label's minimum width is the full
+  width of its text — setting autowrap afterwards is too late, and a long line
+  runs off the screen.
 - Both tests must keep printing their sentinel (`RUN_TEST_OK` / `SIM_OK`). CI
   greps for them, so a test that exits early silently fails the build rather
   than passing it. Adding a scoring rule means adding a case to `run_test.gd`.

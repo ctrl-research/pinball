@@ -73,7 +73,16 @@ func _draw() -> void:
 	var r := TableLayout.BUMPER_RADIUS
 	var skirt := Color(0.16, 0.20, 0.34).lerp(Color(0.35, 0.45, 0.75), _flash)
 	var cap := Color(0.98, 0.76, 0.20).lerp(Color(1.0, 1.0, 0.92), _flash)
+	var lift := TableLayout.EXTRUDE * 1.6  # the tallest thing on the playfield
+
+	draw_circle(Vector2(1.0, lift + 2.0), r * 0.95, Color(0.0, 0.0, 0.0, 0.40))
+	# The body, as a stack of discs from the base up to the cap. A pop bumper
+	# is a cone with a mushroom on top, and three offset circles read as that
+	# far better at this size than any attempt at an actual silhouette.
+	draw_circle(Vector2(0.0, lift), r, skirt.darkened(0.55))
+	draw_circle(Vector2(0.0, lift * 0.5), r, skirt.darkened(0.25))
 	draw_circle(Vector2.ZERO, r, skirt)
 	draw_circle(Vector2.ZERO, r - 3.0, Color(0.10, 0.12, 0.20))
-	draw_circle(Vector2.ZERO, r - 5.0, cap)
+	draw_circle(Vector2(0.0, -1.0), r - 5.0, cap)
+	draw_circle(Vector2(-1.5, -2.5), (r - 5.0) * 0.4, cap.lightened(0.45))
 	draw_arc(Vector2.ZERO, r - 1.0, 0.0, TAU, 20, Color(0.55, 0.62, 0.90), 1.0)

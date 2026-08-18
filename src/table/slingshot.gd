@@ -83,5 +83,9 @@ func _on_entered(body: Node) -> void:
 func _draw() -> void:
 	var base := Color(0.20, 0.18, 0.28)
 	var rubber := Color(0.92, 0.86, 0.30).lerp(Color(1.0, 1.0, 0.95), _flash)
+	var loop := PackedVector2Array([_tri[0], _tri[1], _tri[2], _tri[0]])
+
+	draw_colored_polygon(TableLayout.shift(_tri, TableLayout.EXTRUDE), base.darkened(0.6))
+	draw_polyline(TableLayout.shift(loop, TableLayout.EXTRUDE), rubber.darkened(0.65), 2.0)
 	draw_colored_polygon(_tri, base)
-	draw_polyline(PackedVector2Array([_tri[0], _tri[1], _tri[2], _tri[0]]), rubber, 2.0)
+	draw_polyline(loop, rubber, 2.0)

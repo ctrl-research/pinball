@@ -105,5 +105,12 @@ func _draw() -> void:
 		return
 	var face := Color(0.36, 0.80, 0.92) if is_drop else Color(0.94, 0.50, 0.30)
 	face = face.lerp(Color.WHITE, _flash)
+	# A target stands up out of the playfield, so it gets the tallest side face
+	# of anything except a bumper -- that is what makes a dropped one read as
+	# having actually gone down rather than merely changed colour.
+	var lift := TableLayout.EXTRUDE * 1.3
+	draw_rect(Rect2(r.position + Vector2(0.0, lift), size), face.darkened(0.7))
 	draw_rect(r, Color(0.08, 0.09, 0.14))
 	draw_rect(Rect2(r.position + Vector2.ONE, size - Vector2.ONE * 2.0), face)
+	draw_rect(Rect2(r.position + Vector2.ONE, Vector2(size.x - 2.0, 1.0)),
+		face.lightened(0.4))
