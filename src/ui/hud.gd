@@ -3,7 +3,7 @@ extends CanvasLayer
 ## The two side panels, the backbox readout, and every between-stage screen.
 ##
 ## The split follows what the player is asking at the time. On the left is what
-## they *have* -- the relics and the MULT those relics are feeding, which is the
+## they *have* -- the trinkets and the MULT those trinkets are feeding, which is the
 ## build and changes slowly. On the right is where they *are* -- score against
 ## target, balls, nudges, money, which changes every second the ball is alive.
 ## Mixing the two into one column was the old layout's real problem: a number
@@ -16,9 +16,12 @@ extends CanvasLayer
 
 signal confirmed
 signal bought(index: int)
+signal sold(kind: String, index: int)
+signal used(index: int)
 
-const SLOT_H := 38.0
-const SLOT_GAP := 4.0
+const SLOT_H := 30.0
+const CONSUMABLE_H := 22.0
+const SLOT_GAP := 3.0
 
 const INK := Color(0.86, 0.88, 0.96)
 const DIM := Color(0.46, 0.48, 0.62)
@@ -26,6 +29,9 @@ const GOLD := Color(1.0, 0.82, 0.32)
 const RED := Color(0.94, 0.36, 0.40)
 const PANEL_BG := Color(0.055, 0.052, 0.082)
 const PANEL_EDGE := Color(0.15, 0.15, 0.22)
+const EMPTY_SLOT := Color(0.10, 0.10, 0.16)
+const FULL_SLOT := Color(0.16, 0.14, 0.23)
+const CONSUMABLE_SLOT := Color(0.12, 0.18, 0.20)
 
 var _root: Control
 var _ante: Label
@@ -41,6 +47,7 @@ var _status: Label
 var _toast_label: Label
 var _progress: ColorRect
 var _slots: Array[Control] = []
+var _consumable_slots: Array[Control] = []
 
 var _overlay: Control
 var _overlay_title: Label
@@ -51,8 +58,9 @@ var _toast_t := 0.0
 func _ready() -> void:
 	layer = 1
 	_build()
-	for s in [Run.score_changed, Run.mult_changed, Run.relics_changed,
-			Run.tokens_changed, Run.stage_changed, Run.nudges_changed]:
+	for s in [Run.score_changed, Run.mult_changed, Run.trinkets_changed,
+			Run.consumables_changed, Run.tokens_changed, Run.stage_changed,
+			Run.nudges_changed]:
 		s.connect(_refresh)
 	_refresh()
 
@@ -135,33 +143,45 @@ func _build_left() -> void:
 	var x := p.position.x + 4.0
 	var w := p.size.x - 8.0
 
-	_label("POWER-UPS", Vector2(x, p.position.y + 6.0), w, 8, DIM)
+	_label("TRINKETS", Vector2(x, p.position.y + 6.0), w, 8, DIM)
+	var y := p.position.y + 18.0
+	for i in Run.MAX_TRINKETS:
+		_slots.append(_slot(Vector2(x, y), w, SLOT_H))
+		y += SLOT_H + SLOT_GAP
 
-	for i in Run.MAX_RELICS:
-		var slot := ColorRect.new()
-		slot.position = Vector2(x, p.position.y + 20.0 + float(i) * (SLOT_H + SLOT_GAP))
-		slot.size = Vector2(w, SLOT_H)
-		slot.color = Color(0.10, 0.10, 0.16)
-		slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_root.add_child(slot)
+	y += 6.0
+	_label("CONSUMABLES", Vector2(x, y), w, 8, DIM)
+	y += 12.0
+	for i in Run.MAX_CONSUMABLES:
+		_consumable_slots.append(_slot(Vector2(x, y), w, CONSUMABLE_H))
+		y += CONSUMABLE_H + SLOT_GAP
 
-		# autowrap before size, for the reason spelled out on _label().
-		var text := Label.new()
-		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		text.custom_minimum_size = Vector2(w - 8.0, 0.0)
-		text.position = Vector2(4, 2)
-		text.size = Vector2(w - 8.0, SLOT_H - 4.0)
-		text.add_theme_font_size_override("font_size", 7)
-		text.clip_text = true
-		text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		slot.add_child(text)
-		_slots.append(slot)
+	y += 8.0
+	_label("MULTIPLIER", Vector2(x, y), w, 8, DIM)
+	_mult = _label("x1", Vector2(x, y + 11.0), w, 22, GOLD)
+	_toast_label = _label("", Vector2(x, y + 40.0), w, 9, GOLD, true)
 
-	var mult_y := p.position.y + 20.0 + float(Run.MAX_RELICS) * (SLOT_H + SLOT_GAP) + 10.0
-	_label("MULTIPLIER", Vector2(x, mult_y), w, 8, DIM)
-	_mult = _label("x1", Vector2(x, mult_y + 12.0), w, 26, GOLD)
 
-	_toast_label = _label("", Vector2(x, mult_y + 48.0), w, 10, GOLD, true)
+## One inventory cell: a tinted box with a wrapped label inside it.
+func _slot(pos: Vector2, w: float, h: float) -> ColorRect:
+	var slot := ColorRect.new()
+	slot.position = pos
+	slot.size = Vector2(w, h)
+	slot.color = EMPTY_SLOT
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(slot)
+
+	# autowrap before size, for the reason spelled out on _label().
+	var text := Label.new()
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	text.custom_minimum_size = Vector2(w - 8.0, 0.0)
+	text.position = Vector2(4, 2)
+	text.size = Vector2(w - 8.0, h - 4.0)
+	text.add_theme_font_size_override("font_size", 7)
+	text.clip_text = true
+	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_child(text)
+	return slot
 
 
 func _build_right() -> void:
@@ -284,14 +304,25 @@ func _refresh() -> void:
 
 	for i in _slots.size():
 		var text := _slots[i].get_child(0) as Label
-		if i < Run.relics.size():
-			var def: Dictionary = Catalog.RELICS[Run.relics[i]]
+		if i < Run.trinkets.size():
+			var def: Dictionary = Catalog.TRINKETS[Run.trinkets[i]]
 			text.text = "%s\n%s" % [str(def["name"]).to_upper(), str(def["desc"])]
 			text.add_theme_color_override("font_color", GOLD)
-			_slots[i].color = Color(0.16, 0.14, 0.23)
+			_slots[i].color = FULL_SLOT
 		else:
 			text.text = ""
-			_slots[i].color = Color(0.10, 0.10, 0.16)
+			_slots[i].color = EMPTY_SLOT
+
+	for i in _consumable_slots.size():
+		var text := _consumable_slots[i].get_child(0) as Label
+		if i < Run.consumables.size():
+			var def: Dictionary = Catalog.CONSUMABLES[Run.consumables[i]]
+			text.text = str(def["name"]).to_upper()
+			text.add_theme_color_override("font_color", Color(0.55, 0.90, 0.95))
+			_consumable_slots[i].color = CONSUMABLE_SLOT
+		else:
+			text.text = ""
+			_consumable_slots[i].color = EMPTY_SLOT
 
 
 func toast(text: String) -> void:
@@ -318,9 +349,32 @@ func show_intro() -> void:
 		"Score %s to clear it." % _commas(Run.target),
 		"%d balls -- all of them, target met or not." % Run.balls_for_stage(),
 		boss_line,
-		"",
-		"SPACE to start",
 	])
+
+	# Consumables are spent here, looking at the boss you have been dealt.
+	# That is the whole reason they are stage-scoped rather than per-ball: the
+	# decision wants to be made with the stage in front of you, once.
+	if not Run.consumables.is_empty():
+		_overlay_body.add_child(_body_line("", INK))
+		_overlay_body.add_child(_head_centred("USE A CONSUMABLE?"))
+		for i in Run.consumables.size():
+			var def: Dictionary = Catalog.CONSUMABLES[Run.consumables[i]]
+			var b := Button.new()
+			b.add_theme_font_size_override("font_size", 10)
+			b.clip_text = true
+			b.custom_minimum_size = Vector2(500.0, 0.0)
+			b.text = "%s  -  %s" % [str(def["name"]), str(def["desc"])]
+			b.pressed.connect(used.emit.bind(i))
+			_overlay_body.add_child(b)
+
+	_overlay_body.add_child(_body_line("", INK))
+	_overlay_body.add_child(_body_line("SPACE to start", INK))
+
+
+func _head_centred(text: String) -> Label:
+	var l := _head(text)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return l
 
 
 func show_cleared(payout: Array) -> void:
@@ -332,23 +386,109 @@ func show_cleared(payout: Array) -> void:
 	_open("VICTORY", lines)
 
 
+## Two columns: what is for sale, and what you already own with a price on it.
+##
+## The inventory being *in* the shop is the point. Selling is only a real
+## decision if you can see the thing you would be giving up next to the thing
+## you would be buying with it -- a sell button somewhere else is just a refund.
 func show_shop(offers: Array) -> void:
 	_refresh()
 	_open("SHOP     $%d" % Run.tokens, [])
+
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 16)
+	_overlay_body.add_child(columns)
+
+	var buy_col := VBoxContainer.new()
+	buy_col.custom_minimum_size = Vector2(300.0, 0.0)
+	buy_col.add_theme_constant_override("separation", 3)
+	columns.add_child(buy_col)
+	buy_col.add_child(_head("FOR SALE"))
 	if offers.is_empty():
-		_overlay_body.add_child(_body_line("Sold out.", DIM))
+		buy_col.add_child(_body_line("Sold out.", DIM))
 	for i in offers.size():
-		var offer: Dictionary = offers[i]
-		var button := Button.new()
-		button.text = "%d.  %s  -  %s   ($%d)" % [
-			i + 1, str(offer["name"]), str(offer["desc"]), int(offer["cost"])]
-		button.add_theme_font_size_override("font_size", 10)
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.disabled = Run.tokens < int(offer["cost"])
-		button.pressed.connect(bought.emit.bind(i))
-		_overlay_body.add_child(button)
-	_overlay_body.add_child(_body_line("", INK))
-	_overlay_body.add_child(_body_line("Click to buy.  SPACE to move on.", DIM))
+		buy_col.add_child(_offer_row(offers[i], i, 292.0))
+
+	var own_col := VBoxContainer.new()
+	own_col.custom_minimum_size = Vector2(200.0, 0.0)
+	own_col.add_theme_constant_override("separation", 3)
+	columns.add_child(own_col)
+
+	own_col.add_child(_head("TRINKETS  %d/%d" % [Run.trinkets.size(), Run.MAX_TRINKETS]))
+	if Run.trinkets.is_empty():
+		own_col.add_child(_body_line("none", DIM))
+	for i in Run.trinkets.size():
+		own_col.add_child(_sell_button("trinket", Run.trinkets[i], i))
+
+	own_col.add_child(_head("CONSUMABLES  %d/%d"
+		% [Run.consumables.size(), Run.MAX_CONSUMABLES]))
+	if Run.consumables.is_empty():
+		own_col.add_child(_body_line("none", DIM))
+	for i in Run.consumables.size():
+		own_col.add_child(_sell_button("consumable", Run.consumables[i], i))
+
+	_overlay_body.add_child(_body_line("Click to buy or sell.  SPACE to move on.", DIM))
+
+
+func _head(text: String) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 9)
+	l.add_theme_color_override("font_color", DIM)
+	return l
+
+
+## An offer row: a button carrying the name and price, with the description
+## wrapped underneath it.
+##
+## Not one button with everything in it -- a Button grows to fit its text and
+## will not wrap, so the longest description would widen its column and push the
+## whole two-column layout off the side of the screen.
+func _offer_row(offer: Dictionary, index: int, width: float) -> Control:
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 0)
+	row.custom_minimum_size = Vector2(width, 0.0)
+
+	var cost := int(offer["cost"])
+	var b := Button.new()
+	b.add_theme_font_size_override("font_size", 10)
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.clip_text = true
+	b.custom_minimum_size = Vector2(width, 0.0)
+	b.text = "%s   $%d" % [str(offer["name"]), cost]
+	# Two different reasons a button can be dead, and the player should not have
+	# to work out which one applies.
+	if not Run.can_take(offer):
+		b.disabled = true
+		b.text += "   (no room)"
+	elif Run.tokens < cost:
+		b.disabled = true
+		b.text += "   (too dear)"
+	else:
+		b.pressed.connect(bought.emit.bind(index))
+	row.add_child(b)
+
+	var desc := Label.new()
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.custom_minimum_size = Vector2(width, 0.0)
+	desc.text = str(offer["desc"])
+	desc.add_theme_font_size_override("font_size", 8)
+	desc.add_theme_color_override("font_color", DIM)
+	row.add_child(desc)
+	return row
+
+
+func _sell_button(kind: String, id: String, index: int) -> Button:
+	var def: Dictionary = Catalog.TRINKETS[id] if kind == "trinket" else Catalog.CONSUMABLES[id]
+	var b := Button.new()
+	b.add_theme_font_size_override("font_size", 9)
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.clip_text = true
+	b.custom_minimum_size = Vector2(196.0, 0.0)
+	b.text = "%s   sell $%d" % [str(def["name"]), Catalog.sell_price(kind, id)]
+	b.tooltip_text = str(def["desc"])
+	b.pressed.connect(sold.emit.bind(kind, index))
+	return b
 
 
 func show_lost() -> void:

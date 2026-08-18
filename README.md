@@ -5,7 +5,7 @@ silver ball, a score target you have to beat with the balls you are given, and
 a machine you keep bolting things onto between rounds.
 
 Balatro's run structure — escalating antes, score gates, build-defining
-relics, a shop after everything — poured into a pinball cabinet, with the
+trinkets, a shop after everything — poured into a pinball cabinet, with the
 tactile layer of *3D Pinball: Space Cadet* underneath it: flippers, plunger,
 nudge, tilt.
 
@@ -41,7 +41,9 @@ Eight antes, three stages each: small blind, big blind, boss blind.
 - Clear the stage and you are paid in tokens: the blind's reward multiplied by
   how many times over you beat the target (capped ×5), `$1` per ball you never
   needed, and interest on what you are holding.
-- Spend it on **relics** (up to 5, always-on, the axis you build around),
+- Spend it on **trinkets** (up to 5, always-on, the axis you build around),
+  **consumables** (up to 3, one-shot, spent at a stage intro and lasting that
+  stage),
   **table mods** (which physically change the playfield), or **target levels**
   (which raise the base value of a whole class of target).
 - The **boss blind** attacks the machine rather than the number — a dead
@@ -94,7 +96,7 @@ if the playfield is a *value* you can edit before instantiating it. It also
 means collision and rendering cannot drift apart.
 
 **The table decides nothing.** It reports what was hit; `run.gd` owns every
-number. A relic is a branch at a named hook in one file rather than a patch
+number. A trinket is a branch at a named hook in one file rather than a patch
 threaded through a dozen playfield scripts.
 
 ```
@@ -102,7 +104,7 @@ src/
 ├── autoload/
 │   ├── run.gd        # run state + all scoring arithmetic (autoload "Run")
 │   └── sfx.gd        # procedural audio, synthesised at boot (autoload "Sfx")
-├── run/catalog.gd    # relics, mods, bosses, blind curve -- data only
+├── run/catalog.gd    # trinkets, mods, bosses, blind curve -- data only
 ├── table/
 │   ├── layout.gd     # the machine, as numbers
 │   ├── table.gd      # builds it; plunger, nudge, drain, boss hazards
@@ -152,10 +154,10 @@ that rather than two that drift.
 
 ## Status
 
-The run loop is complete: one table, the full 8-ante structure, 14 relics, 4
-table mods, 8 boss blinds, target levels, and the shop. Two further modifier
-layers — flipper coils and per-ball mods — are designed but not built. The
-presentation is
+The run loop is complete: one table, the full 8-ante structure, 14 trinkets, 4
+table mods, 8 boss blinds, target levels, 8 consumables, and a shop that buys
+and sells. One further modifier layer — flipper coils — is designed but not
+built. The presentation is
 2.5D — perspective playfield, extruded parts, and a drawn cabinet with rails, a
 lockdown bar and a backbox.
 
@@ -183,7 +185,7 @@ See [docs/roadmap.md](docs/roadmap.md) for what comes next. In short:
 3. **The table is sparse.** Three bumpers, three drop targets, two standups,
    two rollovers, a spinner. Enough to prove the scoring engine, thin for a
    machine you are meant to learn by heart.
-4. One table. Variety currently comes from mods and relics only.
+4. One table. Variety currently comes from mods and trinkets only.
 
 ## CI
 

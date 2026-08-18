@@ -5,7 +5,7 @@ between rounds, and a score target that grows faster than you do.
 
 Think **Balatro's run structure poured into a pinball cabinet**: every stage is
 a score you have to beat with a limited number of balls, and the way you beat it
-is the pile of relics, table mods, and target upgrades you've bolted onto the
+is the pile of trinkets, table mods, and target upgrades you've bolted onto the
 machine along the way. The direct ancestors are Balatro (score gates, escalating
 antes, build-defining jokers, a shop between everything) and Pegfinity (physics
 toy as the scoring engine), sat on top of the tactile layer of *3D Pinball:
@@ -50,7 +50,7 @@ playfield as it recedes. A panel brackets it on each side.
 ```
 
 The split follows what the player is asking at the time. **Left is what they
-have** — the relics and the MULT those relics are feeding. It is the build, and
+have** — the trinkets and the MULT those trinkets are feeding. It is the build, and
 it changes slowly. **Right is where they are** — score against target, balls,
 nudges, money, all of which move while the ball is alive. Putting a number that
 changes every frame next to one that almost never does trains you to stop
@@ -209,31 +209,31 @@ So:
 
 | Layer | Acts on | Answers |
 | --- | --- | --- |
-| **Relics** | Events | *What rule is bent?* |
+| **Trinkets** | Events | *What rule is bent?* |
 | **Levels** | Part classes | *What is my best shot worth?* |
 | **Coils** | The flippers | *How long do I keep the ball alive?* |
-| **Ball mods** | One ball | *What is **this** ball?* |
+| **Consumables** | One stage | *What does **this** stage need?* |
 | **Table mods** | The playfield | *What does the machine look like?* |
 
-The load-bearing split is the last two columns against the first two. Relics and
-levels make a good ball **worth more**. Coils and ball mods make good balls
+The load-bearing split is the last two columns against the first two. Trinkets and
+levels make a good ball **worth more**. coils and consumables make good balls
 **more likely**. A run that only buys score dies at ante 4 with a huge MULT it
 never got to use; a run that only buys survival keeps the ball alive for a
 minute and still misses the target. That tension is the build decision, and it
 is the thing a naive Balatro clone leaves out.
 
-**Relics stay the primary axis.** Balatro is a game about jokers with four
+**Trinkets stay the primary axis.** Balatro is a game about jokers with four
 supporting systems, not a game about five equal systems — spreading power evenly
 across categories is how this ends up with five shallow ones. The rule of thumb:
-if an effect could be a relic, it should be a relic.
+if an effect could be a trinket, it should be a trinket.
 
-### Relics (jokers)
+### Trinkets (jokers)
 
 Up to **5 slots** on the panel. Passive, always-on, and the primary axis of a
 build. They hook a small set of events: `on_hit`, `on_score`, `on_ball_start`,
 `on_drain`, `on_stage_start`.
 
-| Relic | Effect |
+| Trinket | Effect |
 | --- | --- |
 | Brass Bumper | Pop bumpers score ×3 value |
 | Combo Coil | Each hit within 1.5s of the last: +0.2 MULT |
@@ -271,7 +271,7 @@ layout rather than hand-placed in a scene, a mod is just an edit to that data.
 
 Level up a *class* of target rather than an instance. `Bumpers Lv3` raises the
 base value of every bumper on the table. This is the flat-power axis that keeps
-pace with the score curve when the relic pool goes dry, and it is what makes a
+pace with the score curve when the trinket pool goes dry, and it is what makes a
 table mod that adds a fourth bumper worth more later than it was early.
 
 | Class | Base value | Per level |
@@ -312,38 +312,61 @@ flipper rolls the ball straight to its tip. Adding it is the difference between
 control, and a player who buys both it and `Hot Winding` should find the table
 genuinely harder to hold. Not every coil should be a straight upgrade.
 
-### Ball mods
+### Consumables
 
-Applied to **one ball**, chosen before it is plunged. Everything else in the
-build is decided in the shop, minutes before it matters; this is the only layer
-that asks the player a question *during* a stage — "I have two balls left and
-I'm 4,000 short: do I spend the Heavy Ball now or save it?"
+One-shot items, held **up to three** at a time, bought and sold in the shop and
+spent on the stage intro screen. Their effects last exactly one stage.
 
-That per-ball decision point is worth more than the effects themselves. Right
-now the only choices in a stage are which target to shoot at, and the game is
-thinner for it.
+Trinkets are the build and change slowly; consumables are the answer to "I need
+*this* stage to go differently". That makes them the only part of the economy
+spent reactively — you buy a trinket because of what your run is becoming, and a
+consumable because of the boss you have just been dealt.
 
-| Ball mod | Effect |
-| --- | --- |
-| Heavy Ball | Ball is 2× the size — cannot fit down the drain gap, but also cannot enter the orbits or lanes |
-| Light Ball | Smaller and faster; reaches shots a normal ball cannot, drains more easily |
-| Gilded Ball | This ball's hits score ×2 |
-| Slow Ball | Time runs at 60% for this ball's first 10 seconds |
-| Ghost Ball | Survives its first drain |
-| Split Ball | Becomes two balls on the first bumper hit |
+| Consumable | Effect | Cost |
+| --- | --- | --- |
+| Steady Hand | Nudges recharge 3× faster | `$3` |
+| Ball Polish | All values ×2 | `$5` |
+| Second Wind | The first drain returns the ball | `$5` |
+| Jackpot Charge | The first hit of each ball scores ×10 | `$5` |
+| Extra Ball | One more ball this stage | `$6` |
+| Loaded Plunger | Every ball starts at MULT ×3 | `$6` |
+| Overclock | MULT gains are doubled | `$6` |
+| Heavy Ball | The ball is twice the size | `$7` |
 
-`Heavy Ball` is the clearest example of why the playfield being *data* pays off.
-Doubling the ball's radius is one number, and the consequences are entirely
-geometric and entirely honest: an 8px drain gap will not pass a 16px ball, and
-neither will an 11px outlane or a 22px orbit. The upgrade protects you and locks
-you out of half the table in the same stroke, and nobody had to write a rule
-saying so.
+**Stage-scoped rather than per-ball.** An earlier draft had these chosen before
+each plunge, which is a better decision in the abstract and three interruptions
+a stage in practice. One choice at the intro, made while looking at the boss you
+have drawn, is the same decision with none of the friction.
 
-`Slow Ball` needs care. Slowing time is the most powerful thing you can hand a
-player in a real-time game — it makes *everything* easier, including the parts
-that are supposed to be hard. So it is strictly limited: a few seconds, once per
-ball, never permanent. If it becomes a general difficulty setting it will
-quietly replace skill, and the feel gate stops meaning anything.
+`Heavy Ball` is the clearest thing the playfield-as-data buys us. Doubling the
+radius is one number, and the consequences are entirely geometric and entirely
+honest: an 18px drain gap will not pass a 16px ball, and neither will an 11px
+outlane or a 22px orbit. It protects you and locks you out of half the table in
+the same stroke, and nobody had to write a rule saying so.
+
+Duplicates are allowed, unlike trinkets — holding two Ball Polish is a
+legitimate thing to want, and holding two of the same trinket is not.
+
+### The shop
+
+Four offers, weighted toward trinkets and consumables. Trinkets lead because
+they are the axis players build around; consumables are second because they are
+the only thing that answers a boss already in view. Table mods and levels are
+the long tail.
+
+**Your inventory is shown in the shop, with a price on it.** Anything owned can
+be sold back for **75% of its shelf price, rounded down**.
+
+That the inventory is *in* the shop is the point. Selling is only a real
+decision if you can see the thing you would be giving up next to the thing you
+would be buying with it; a sell button on some other screen is just a refund.
+The 25% loss is what stops the shop being a place to park money rather than a
+place to make a choice.
+
+An offer you have no room for is shown greyed with *no room*, and one you cannot
+afford with *too dear* — two different reasons a thing is unavailable, and the
+player should not have to work out which applies. Selling immediately re-enables
+anything that was blocked on space.
 
 ### What these categories are *not*
 
@@ -351,7 +374,7 @@ Two of the obvious ideas already exist under other names, and giving them their
 own layer would be the mistake that turns five categories into five shallow
 ones:
 
-- **"Score multipliers from hitting components"** is what `Relics` and `Levels`
+- **"Score multipliers from hitting components"** is what `Trinkets` and `Levels`
   already are — `Brass Bumper` is a component multiplier, and `Bumpers Lv3` is
   the flat version of the same thing.
 - **"Bumper multipliers"** is exactly `Target levels`. The bumper is one of
@@ -383,7 +406,7 @@ away information, not power, and a player who knows the table by feel beats it.
 
 ## The table
 
-One machine for now. Variety comes from mods and relics rather than from a table
+One machine for now. Variety comes from mods and trinkets rather than from a table
 pool; a second table is worth building only once the modifier layers are proven,
 because every table has to be balanced against all of them.
 
@@ -445,7 +468,7 @@ inserts, a segmented-LED score readout on the panel.
 1. **Vertical slice** — one table, real flipper feel, score/MULT, 3 balls, a
    stage target, win/lose. *No roguelike layer.* If the flippers are not fun
    with nothing bolted on, nothing bolted on will save them.
-2. **Run loop** — antes, blinds, tokens, shop, 6–8 relics.
+2. **Run loop** — antes, blinds, tokens, shop, 6–8 trinkets.
 3. **Full modifier set** — table mods, target levels, all boss blinds.
 4. **Feel pass** — sound, screen shake, insert lighting, score popcorn.
 5. **Meta** — unlocks, seeded runs, daily.
