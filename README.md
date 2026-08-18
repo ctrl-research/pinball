@@ -43,7 +43,7 @@ Eight antes, three stages each: small blind, big blind, boss blind.
   how many times over you beat the target (capped ×5), `$1` per ball you never
   needed, and interest on what you are holding.
 - Spend it on **trinkets** (up to 5, always-on, the axis you build around),
-  **consumables** (up to 3, one-shot, fired mid-ball with the 1-3 keys and
+  **consumables** (3 slots, stackable, fired mid-ball with the 1-3 keys and
   mostly running on a timer),
   **table mods** (which physically change the playfield), or **target levels**
   (which raise the base value of a whole class of target).

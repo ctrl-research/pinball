@@ -345,10 +345,24 @@ under pressure — if the rack shuffled, a panicked double-tap would burn two
 items, and "my Slow Ball is 2" would never become muscle memory. A hole is the
 price of a stable binding.
 
-Duplicates are allowed, unlike trinkets — holding two Ball Polish is a
-legitimate thing to want, and holding two of the same trinket is not. Refiring
-an effect that is already running restarts its timer rather than stacking,
-because two overlapping Ball Polish would be ×4 and nothing in the shop says so.
+**Duplicates stack.** Buying a second Ball Polish adds to the slot you already
+have rather than taking a second one, and firing spends exactly one — the rest
+stay on the same key. So the three-slot limit is a limit on **kinds**, not on
+items: you can hold three Ball Polish and two Slow Ball across two slots.
+
+Stacks are capped at **5** per slot. Purely a balance number — it keeps the
+readout single-digit and stops three slots becoming unbounded storage — and
+nothing breaks if it moves. Past the cap, a further copy takes a fresh slot if
+one is free.
+
+Trinkets do not stack, because two of the same trinket is not a thing anyone
+wants: a second Brass Bumper would either do nothing or silently square itself,
+and neither reads.
+
+Refiring an effect that is already running restarts its timer rather than
+stacking, because two overlapping Ball Polish would be ×4 and nothing in the
+shop says so. Stacking is about how many you *hold*, not how many can run at
+once.
 
 #### Why Heavy Ball is not here
 

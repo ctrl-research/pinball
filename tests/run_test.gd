@@ -272,26 +272,73 @@ func _inventory() -> void:
 		_check(Run.add_trinket(id), "trinket %s fits" % id)
 	_check(not Run.add_trinket("deadhead"), "the sixth trinket is refused")
 
+	# Duplicates stack into one slot rather than taking a second.
 	_eq(Run.add_consumable("ball_polish"), true, "a consumable fits")
-	_eq(Run.add_consumable("ball_polish"), true, "and duplicates are allowed")
-	_eq(Run.add_consumable("overclock"), true, "three consumables fit")
-	_check(not Run.add_consumable("slow_ball"), "the fourth consumable is refused")
-	_eq(Run.consumable_count(), 3, "three are held")
+	_eq(Run.add_consumable("ball_polish"), true, "a second stacks")
+	_eq(Run.consumable_stacks[0], 2, "making a stack of two")
+	_eq(Run.consumable_count(), 1, "in a single slot")
 
-	# Slots are fixed: firing one leaves a hole rather than shuffling.
+	_eq(Run.add_consumable("overclock"), true, "a different kind takes its own slot")
+	_eq(Run.add_consumable("surge"), true, "and a third fills the rack")
+	_check(not Run.add_consumable("slow_ball"), "a fourth *kind* is refused")
+	_check(Run.add_consumable("ball_polish"), "but stacking an existing kind still fits")
+	_eq(Run.consumable_stacks[0], 3, "making three")
+
+	# Firing takes one off the stack and leaves the rest on the same key.
 	_check(Run.use_consumable(0), "slot 1 fires")
-	_eq(Run.consumables[0], "", "and leaves slot 1 empty")
-	_eq(Run.consumables[2], "overclock", "without moving slot 3")
-	_check(not Run.use_consumable(0), "so slot 1 cannot fire twice")
-	_eq(Run.consumable_count(), 2, "two are left")
-	_check(Run.add_consumable("surge"), "and a new one refills the hole")
-	_eq(Run.consumables[0], "surge", "in slot 1")
+	_eq(Run.consumable_stacks[0], 2, "consuming exactly one")
+	_eq(Run.consumables[0], "ball_polish", "and the slot keeps its kind")
+	_check(Run.use_consumable(0), "it fires again")
+	_check(Run.use_consumable(0), "and again")
+	_eq(Run.consumable_stacks[0], 0, "until the stack is spent")
+	_eq(Run.consumables[0], "", "and the slot empties")
+	_check(not Run.use_consumable(0), "an empty slot fires nothing")
+
+	# Slots are fixed: an emptied one leaves a hole rather than shuffling.
+	_eq(Run.consumables[2], "surge", "slot 3 never moved")
+	_check(Run.add_consumable("slow_ball"), "a new kind refills the hole")
+	_eq(Run.consumables[0], "slow_ball", "in slot 1")
+
+	# The stack has a ceiling.
+	Run.new_run(1043)
+	for i in Run.MAX_STACK:
+		_check(Run.add_consumable("surge"), "surge %d stacks" % (i + 1))
+	_eq(Run.consumable_stacks[0], Run.MAX_STACK, "up to the cap")
+	_check(Run.add_consumable("surge"), "past the cap it takes a fresh slot")
+	_eq(Run.consumable_stacks[1], 1, "starting a second stack")
+
+	# A full rack still has room for a kind it already holds.
+	Run.new_run(1044)
+	for id in ["surge", "overclock", "ball_polish"]:
+		Run.add_consumable(id)
+	_check(not Run.can_take({"kind": "consumable", "id": "slow_ball", "cost": 7}),
+		"a full rack refuses a new kind")
+	_check(Run.can_take({"kind": "consumable", "id": "surge", "cost": 6}),
+		"but accepts one it can stack")
+
+	# Selling takes one off the stack, not the lot.
+	Run.new_run(1045)
+	Run.add_consumable("ball_polish")
+	Run.add_consumable("ball_polish")
+	Run.tokens = 0
+	_eq(Run.sell("consumable", 0), Catalog.sell_price("consumable", "ball_polish"),
+		"selling pays for one")
+	_eq(Run.consumable_stacks[0], 1, "and leaves the rest of the stack")
+	_eq(Run.sell("consumable", 0), Catalog.sell_price("consumable", "ball_polish"),
+		"the last one sells too")
+	_eq(Run.consumables[0], "", "emptying the slot")
+	_eq(Run.sell("consumable", 0), 0, "and an empty slot sells nothing")
 
 	# Selling returns 75% of shelf price, rounded down.
 	_eq(Catalog.sell_price("trinket", "brass_bumper"), 3, "a $4 trinket sells for $3")
 	_eq(Catalog.sell_price("consumable", "steady_hand"), 2, "a $3 consumable sells for $2")
 	_eq(Catalog.sell_price("trinket", "deadhead"), 7, "a $10 trinket sells for $7")
 
+	# Fresh rack: the consumable cases above each start their own run, so the
+	# trinkets added at the top of this test are long gone.
+	Run.new_run(1046)
+	Run.add_trinket("brass_bumper")
+	Run.add_trinket("skill_shot")
 	Run.tokens = 0
 	var before := Run.trinkets.size()
 	_eq(Run.sell("trinket", 0), 3, "selling pays out")
