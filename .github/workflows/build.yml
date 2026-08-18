@@ -96,12 +96,26 @@ jobs:
           ./godot --headless --path . --quit-after 5000 tests/headless_sim.tscn 2>&1 | tee -a build.log
           grep -q "SIM_OK" build.log
 
+      # The manual's tables are generated from the same Catalog the game runs
+      # on, so a cost or an effect cannot be stale in the document and correct
+      # in the code. This fails the build if someone changed catalog.gd without
+      # regenerating -- which is the only way "kept up to date" survives.
+      - name: Manual is up to date
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . tools/dump_catalog.tscn 2>/dev/null > /tmp/catalog.json
+          python3 tools/build_manual.py /tmp/catalog.json --check
+
       - name: Export Web build
         run: |
           set -euo pipefail
           mkdir -p build/web
           ./godot --headless --path . --export-release "Web" "build/web/index.html" 2>&1 | tee -a build.log
           test -f "build/web/index.html"
+          # The manual ships inside the same Pages artifact, at /manual/. The
+          # game owns the root, so it gets a subpath rather than its own site.
+          python3 tools/build_manual.py /tmp/catalog.json --html build/web/manual/index.html
+          test -f "build/web/manual/index.html"
 
       - name: Verify no GDScript parse or autoload errors
         run: |
