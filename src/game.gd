@@ -33,7 +33,6 @@ func _ready() -> void:
 	hud.confirmed.connect(_on_confirmed)
 	hud.bought.connect(_on_bought)
 	hud.sold.connect(_on_sold)
-	hud.used.connect(_on_used)
 
 	Run.toast.connect(hud.toast)
 	_enter_intro()
@@ -87,6 +86,15 @@ func _enter_won() -> void:
 
 
 # --- Events -------------------------------------------------------------------
+
+
+func _process(_delta: float) -> void:
+	if state != State.PLAYING:
+		return
+	for i in Run.MAX_CONSUMABLES:
+		if Input.is_action_just_pressed("use_consumable_%d" % (i + 1)):
+			_on_used(i)
+			return
 
 
 func _on_drained(via_outlane: bool) -> void:
@@ -146,12 +154,9 @@ func _on_sold(kind: String, index: int) -> void:
 
 
 func _on_used(index: int) -> void:
-	if state != State.INTRO:
+	# Fired from the 1-3 keys with the ball live, never from a menu. A
+	# consumable spent on a menu is just a slower shop purchase.
+	if state != State.PLAYING:
 		return
 	if Run.use_consumable(index):
 		Sfx.play("buy")
-		# The table is rebuilt so a consumable that changes the machine (a
-		# heavier ball) is in effect before the first plunge, not after it.
-		table.build()
-		table.set_fog(Run.boss_active("fog"))
-		hud.show_intro()

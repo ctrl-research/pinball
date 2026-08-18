@@ -17,10 +17,9 @@ extends CanvasLayer
 signal confirmed
 signal bought(index: int)
 signal sold(kind: String, index: int)
-signal used(index: int)
 
-const SLOT_H := 30.0
-const CONSUMABLE_H := 22.0
+const SLOT_H := 26.0
+const CONSUMABLE_H := 20.0
 const SLOT_GAP := 3.0
 
 const INK := Color(0.86, 0.88, 0.96)
@@ -48,6 +47,7 @@ var _toast_label: Label
 var _progress: ColorRect
 var _slots: Array[Control] = []
 var _consumable_slots: Array[Control] = []
+var _active_labels: Array[Label] = []
 
 var _overlay: Control
 var _overlay_title: Label
@@ -70,8 +70,20 @@ func _process(delta: float) -> void:
 		_toast_t -= delta
 		if _toast_t <= 0.0:
 			_toast_label.text = ""
-	# Nudge recharges continuously, so its readout cannot be signal-driven.
+	# Nudge recharges continuously and effects count down, so neither readout
+	# can be signal-driven.
 	_nudge.text = "NUDGE  %s" % _pips(int(Run.nudges), Run.MAX_NUDGES)
+
+	var row := 0
+	for id in Run.effects:
+		if row >= _active_labels.size():
+			break
+		_active_labels[row].text = "%s  %ds" % [
+			str(Catalog.CONSUMABLES[id]["name"]).to_upper(),
+			int(ceil(Run.effect_remaining(id)))]
+		row += 1
+	for i in range(row, _active_labels.size()):
+		_active_labels[i].text = ""
 
 
 func _input(event: InputEvent) -> void:
@@ -156,10 +168,17 @@ func _build_left() -> void:
 		_consumable_slots.append(_slot(Vector2(x, y), w, CONSUMABLE_H))
 		y += CONSUMABLE_H + SLOT_GAP
 
-	y += 8.0
+	y += 6.0
+	_label("ACTIVE", Vector2(x, y), w, 8, DIM)
+	y += 10.0
+	for i in Run.MAX_CONSUMABLES:
+		_active_labels.append(_label("", Vector2(x, y), w, 8, Color(0.55, 0.90, 0.95)))
+		y += 10.0
+
+	y += 6.0
 	_label("MULTIPLIER", Vector2(x, y), w, 8, DIM)
-	_mult = _label("x1", Vector2(x, y + 11.0), w, 22, GOLD)
-	_toast_label = _label("", Vector2(x, y + 40.0), w, 9, GOLD, true)
+	_mult = _label("x1", Vector2(x, y + 10.0), w, 20, GOLD)
+	_toast_label = _label("", Vector2(x, y + 36.0), w, 9, GOLD, true)
 
 
 ## One inventory cell: a tinted box with a wrapped label inside it.
@@ -216,7 +235,7 @@ func _build_right() -> void:
 	_nudge = _label("", Vector2(x, p.position.y + 126.0), w, 10, INK)
 	_tokens = _label("", Vector2(x, p.position.y + 146.0), w, 14, GOLD)
 
-	_label("A / D  flippers\nSPACE  hold to plunge\nQ / W / E  nudge\n\n"
+	_label("A / D  flippers\nSPACE  hold to plunge\nQ / W / E  nudge\n1 / 2 / 3  consumables\n\n"
 		+ "Nudge on empty and it tilts.",
 		Vector2(x, p.position.y + 274.0), w, 7, DIM, true)
 
@@ -315,13 +334,16 @@ func _refresh() -> void:
 
 	for i in _consumable_slots.size():
 		var text := _consumable_slots[i].get_child(0) as Label
-		if i < Run.consumables.size():
+		# The number is the keybind. A slot that does not say which key fires it
+		# is a mechanic the player has to be told about out of band.
+		if Run.consumables[i] != "":
 			var def: Dictionary = Catalog.CONSUMABLES[Run.consumables[i]]
-			text.text = str(def["name"]).to_upper()
+			text.text = "%d  %s" % [i + 1, str(def["name"]).to_upper()]
 			text.add_theme_color_override("font_color", Color(0.55, 0.90, 0.95))
 			_consumable_slots[i].color = CONSUMABLE_SLOT
 		else:
-			text.text = ""
+			text.text = "%d  --" % (i + 1)
+			text.add_theme_color_override("font_color", DIM)
 			_consumable_slots[i].color = EMPTY_SLOT
 
 
@@ -350,22 +372,6 @@ func show_intro() -> void:
 		"%d balls -- all of them, target met or not." % Run.balls_for_stage(),
 		boss_line,
 	])
-
-	# Consumables are spent here, looking at the boss you have been dealt.
-	# That is the whole reason they are stage-scoped rather than per-ball: the
-	# decision wants to be made with the stage in front of you, once.
-	if not Run.consumables.is_empty():
-		_overlay_body.add_child(_body_line("", INK))
-		_overlay_body.add_child(_head_centred("USE A CONSUMABLE?"))
-		for i in Run.consumables.size():
-			var def: Dictionary = Catalog.CONSUMABLES[Run.consumables[i]]
-			var b := Button.new()
-			b.add_theme_font_size_override("font_size", 10)
-			b.clip_text = true
-			b.custom_minimum_size = Vector2(500.0, 0.0)
-			b.text = "%s  -  %s" % [str(def["name"]), str(def["desc"])]
-			b.pressed.connect(used.emit.bind(i))
-			_overlay_body.add_child(b)
 
 	_overlay_body.add_child(_body_line("", INK))
 	_overlay_body.add_child(_body_line("SPACE to start", INK))
@@ -421,11 +427,13 @@ func show_shop(offers: Array) -> void:
 		own_col.add_child(_sell_button("trinket", Run.trinkets[i], i))
 
 	own_col.add_child(_head("CONSUMABLES  %d/%d"
-		% [Run.consumables.size(), Run.MAX_CONSUMABLES]))
-	if Run.consumables.is_empty():
+		% [Run.consumable_count(), Run.MAX_CONSUMABLES]))
+	if Run.consumable_count() == 0:
 		own_col.add_child(_body_line("none", DIM))
 	for i in Run.consumables.size():
-		own_col.add_child(_sell_button("consumable", Run.consumables[i], i))
+		# Index, not position: slot 2 sells slot 2 even if slot 1 is a hole.
+		if Run.consumables[i] != "":
+			own_col.add_child(_sell_button("consumable", Run.consumables[i], i))
 
 	_overlay_body.add_child(_body_line("Click to buy or sell.  SPACE to move on.", DIM))
 

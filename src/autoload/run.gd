@@ -33,7 +33,13 @@ var ante := 1
 var blind := Catalog.SMALL
 var tokens := 0
 var trinkets: Array[String] = []
-var consumables: Array[String] = []
+## Always MAX_CONSUMABLES long, with "" for an empty slot.
+##
+## Fixed slots rather than a list that closes up, because these are bound to
+## keys and fired under pressure. If firing slot 1 shuffled slot 2 down into it,
+## a panicked double-tap would burn two items, and "my Slow Ball is 2" would
+## never become muscle memory. A hole is the price of a stable binding.
+var consumables: Array[String] = ["", "", ""]
 var mods: Array[String] = []
 var levels := {}  ## Catalog.Source -> int, absent means level 1
 var rng := RandomNumberGenerator.new()
@@ -51,8 +57,11 @@ var stage_mult_bonus := 0.0  ## Drop Devotion, and anything else that persists a
 ## `balls_left` is zero by the time it is scored -- but "how many balls you did
 ## not need" is still the thing the payout should reward, and this is the only
 ## place it exists.
-## Stage-scoped switches turned on by spending a consumable. Cleared every
-## stage, which is what makes them consumable rather than a second trinket slot.
+## Active consumable effects: id -> the real-time millisecond it expires at.
+##
+## Real time from Time.get_ticks_msec() rather than accumulated delta, because
+## Slow Ball scales delta -- timing a six-second effect with a clock the effect
+## itself slows down would make it last eleven.
 var effects := {}
 var _second_wind_used := false
 var target_met := false
@@ -77,10 +86,22 @@ func _ready() -> void:
 	new_run()
 
 
+## How far Slow Ball winds the world down.
+const SLOW_SCALE := 0.55
+
+
 func _process(delta: float) -> void:
+	_expire_effects()
+	# Derived every frame rather than set on use and unset on expiry. A leaked
+	# time scale means the whole game runs slow forever, and deriving it makes
+	# that unreachable -- there is no path where it is set and not cleared.
+	var want := SLOW_SCALE if effect_active("slow_ball") else 1.0
+	if not is_equal_approx(Engine.time_scale, want):
+		Engine.time_scale = want
+
 	if nudges < MAX_NUDGES:
 		var before := int(nudges)
-		var rate := NUDGE_RECHARGE / (3.0 if effects.has("steady_hand") else 1.0)
+		var rate := NUDGE_RECHARGE / (3.0 if effect_active("steady_hand") else 1.0)
 		nudges = minf(float(MAX_NUDGES), nudges + delta / rate)
 		if int(nudges) != before:
 			nudges_changed.emit()
@@ -96,7 +117,7 @@ func new_run(with_seed: int = 0) -> void:
 	blind = Catalog.SMALL
 	tokens = 4
 	trinkets.clear()
-	consumables.clear()
+	_clear_consumables()
 	mods.clear()
 	levels.clear()
 	begin_stage()
@@ -132,8 +153,6 @@ func begin_ball() -> void:
 	if not has_trinket("deadhead"):
 		mult = 1.0
 	mult += stage_mult_bonus
-	if effects.has("loaded_plunger"):
-		mult = maxf(mult, 3.0)
 	nudges = float(MAX_NUDGES)
 	tilted = false
 	_hits_this_ball = 0
@@ -150,7 +169,7 @@ func begin_ball() -> void:
 func consume_ball(via_outlane: bool) -> bool:
 	if via_outlane and has_trinket("outlane_insurance"):
 		_grant_tokens(3, "Outlane Insurance +$3")
-	if effects.has("second_wind") and not _second_wind_used:
+	if effect_active("second_wind") and not _second_wind_used:
 		_second_wind_used = true
 		toast.emit("SECOND WIND")
 		begin_ball()
@@ -283,7 +302,7 @@ func register_hit(source: int, count: int = 1) -> int:
 
 	if has_trinket("cold_solder"):
 		value *= 2.0
-	if effects.has("ball_polish"):
+	if effect_active("ball_polish"):
 		value *= 2.0
 
 	# --- per-hit trinket and boss hooks ---
@@ -295,9 +314,6 @@ func register_hit(source: int, count: int = 1) -> int:
 	if _hits_this_ball == 0 and has_trinket("skill_shot"):
 		value *= 5.0
 		toast.emit("SKILL SHOT x5")
-	if _hits_this_ball == 0 and effects.has("jackpot_charge"):
-		value *= 10.0
-		toast.emit("JACKPOT CHARGE x10")
 	_hits_this_ball += count
 
 	if boss_active("reset"):
@@ -307,6 +323,8 @@ func register_hit(source: int, count: int = 1) -> int:
 			mult = 1.0 + stage_mult_bonus
 			mult_changed.emit()
 
+	if effect_active("jackpot_charge"):
+		value += 500.0
 	var points := int(round(value * effective_mult()))
 
 	if has_trinket("jackpot_lamp"):
@@ -338,7 +356,7 @@ func _bank(points: int) -> void:
 
 
 func add_mult(amount: float) -> void:
-	if effects.has("overclock"):
+	if effect_active("overclock"):
 		amount *= 2.0
 	mult += amount
 	mult_changed.emit()
@@ -393,8 +411,23 @@ func try_nudge() -> int:
 ## through the 18px drain gap, and no longer fits down an 11px outlane or a
 ## 22px orbit either. It protects and locks out in the same stroke, and nobody
 ## had to write a rule saying so.
-func ball_radius_scale() -> float:
-	return 2.0 if effects.has("heavy_ball") else 1.0
+func effect_active(id: String) -> bool:
+	return effects.has(id)
+
+
+## Seconds left on an effect, for the readout. Zero if it is not running.
+func effect_remaining(id: String) -> float:
+	if not effects.has(id):
+		return 0.0
+	return maxf(0.0, (float(effects[id]) - float(Time.get_ticks_msec())) / 1000.0)
+
+
+func _expire_effects() -> void:
+	var now := float(Time.get_ticks_msec())
+	for id in effects.keys():
+		if float(effects[id]) <= now:
+			effects.erase(id)
+			toast.emit("%s ENDED" % str(Catalog.CONSUMABLES[id]["name"]).to_upper())
 
 
 func has_trinket(id: String) -> bool:
@@ -412,28 +445,52 @@ func add_trinket(id: String) -> bool:
 ## Duplicates are allowed, unlike trinkets: holding two Ball Polish is a
 ## legitimate thing to want, and holding two of the same trinket is not.
 func add_consumable(id: String) -> bool:
-	if consumables.size() >= MAX_CONSUMABLES:
+	var slot := consumables.find("")
+	if slot < 0:
 		return false
-	consumables.append(id)
+	consumables[slot] = id
 	consumables_changed.emit()
 	return true
 
 
-## Spend a consumable. Everything except Extra Ball simply switches on a
-## stage-scoped effect; Extra Ball is immediate because a ball count is not an
-## effect, it is a resource.
+func consumable_count() -> int:
+	var n := 0
+	for id in consumables:
+		if id != "":
+			n += 1
+	return n
+
+
+func _clear_consumables() -> void:
+	consumables.clear()
+	for i in MAX_CONSUMABLES:
+		consumables.append("")
+
+
+## Fire a consumable, mid-ball, from the 1-3 keys.
+##
+## Instants act now; everything else starts a real-time timer. Refiring an
+## effect that is already running restarts it rather than stacking, because two
+## overlapping copies of Ball Polish would be x4 and nothing in the shop says so.
 func use_consumable(index: int) -> bool:
-	if index < 0 or index >= consumables.size():
+	if index < 0 or index >= consumables.size() or consumables[index] == "":
 		return false
 	var id: String = consumables[index]
-	consumables.remove_at(index)
-	if id == "extra_ball":
-		balls_left += 1
-		stage_changed.emit()
-	else:
-		effects[id] = true
+	var def: Dictionary = Catalog.CONSUMABLES[id]
+	consumables[index] = ""
+
+	match id:
+		"extra_ball":
+			balls_left += 1
+			stage_changed.emit()
+		"surge":
+			mult = maxf(mult, 3.0)
+			mult_changed.emit()
+		_:
+			effects[id] = Time.get_ticks_msec() + int(float(def["duration"]) * 1000.0)
+
 	consumables_changed.emit()
-	toast.emit(str(Catalog.CONSUMABLES[id]["name"]).to_upper())
+	toast.emit(str(def["name"]).to_upper())
 	return true
 
 
@@ -443,9 +500,15 @@ func sell(kind: String, index: int) -> int:
 	var list: Array = trinkets if kind == "trinket" else consumables
 	if index < 0 or index >= list.size():
 		return 0
-	var id: String = list[index]
+	var id: String = str(list[index])
+	if id == "":
+		return 0
 	var price := Catalog.sell_price(kind, id)
-	list.remove_at(index)
+	# Trinkets close up; consumable slots stay put, so selling leaves a hole.
+	if kind == "trinket":
+		list.remove_at(index)
+	else:
+		list[index] = ""
 	tokens += price
 	tokens_changed.emit()
 	if kind == "trinket":
@@ -462,7 +525,7 @@ func can_take(offer: Dictionary) -> bool:
 		"trinket":
 			return trinkets.size() < MAX_TRINKETS and not has_trinket(str(offer["id"]))
 		"consumable":
-			return consumables.size() < MAX_CONSUMABLES
+			return consumables.has("")
 	return true
 
 

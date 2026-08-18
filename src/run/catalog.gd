@@ -117,42 +117,55 @@ const TRINKETS := {
 
 # --- Consumables --------------------------------------------------------------
 
-## One-shot items, held up to three at a time and spent on the stage intro
-## screen. Their effects last exactly one stage.
+## One-shot items, held up to three at a time and fired **mid-ball** with the
+## 1-3 keys. Most run on a timer and then stop.
 ##
-## Trinkets are the build and change slowly; consumables are the answer to "I
-## need *this* stage to go differently". That makes them the only part of the
-## economy a player spends reactively -- you buy a trinket because of what your
-## run is becoming, and a consumable because of the boss you have just been dealt.
+## That timing is the whole design. A consumable spent on a menu is just a
+## slower shop purchase; a consumable spent with the ball live is a read -- pop
+## Ball Polish now, or hold it in case this ball reaches the bumpers? An earlier
+## version had these chosen on the stage intro screen and it was exactly the
+## boring version of this.
 ##
-## Stage-scoped rather than per-ball on purpose. A per-ball choice would need a
-## prompt between every ball, which is three interruptions a stage; one decision
-## at the intro, made while looking at the boss you have drawn, is the same
-## choice with none of the friction.
+## `duration` of 0 means it fires once and is over; anything else is seconds of
+## real time, which is why the strongest ones are the shortest.
 const CONSUMABLES = {
-	"ball_polish": {
-		"name": "Ball Polish", "desc": "This stage: all values x2", "cost": 5,
-	},
-	"loaded_plunger": {
-		"name": "Loaded Plunger", "desc": "This stage: every ball starts at MULT x3", "cost": 6,
-	},
-	"extra_ball": {
-		"name": "Extra Ball", "desc": "One more ball this stage", "cost": 6,
-	},
 	"steady_hand": {
-		"name": "Steady Hand", "desc": "This stage: nudges recharge 3x faster", "cost": 3,
+		"name": "Steady Hand", "desc": "30s: nudges recharge 3x faster",
+		"cost": 3, "duration": 30.0,
 	},
-	"heavy_ball": {
-		"name": "Heavy Ball", "desc": "This stage: the ball is twice the size", "cost": 7,
-	},
-	"second_wind": {
-		"name": "Second Wind", "desc": "This stage: the first drain returns the ball", "cost": 5,
+	"ball_polish": {
+		"name": "Ball Polish", "desc": "20s: all values x2",
+		"cost": 5, "duration": 20.0,
 	},
 	"overclock": {
-		"name": "Overclock", "desc": "This stage: MULT gains are doubled", "cost": 6,
+		"name": "Overclock", "desc": "20s: MULT gains are doubled",
+		"cost": 6, "duration": 20.0,
+	},
+	"second_wind": {
+		"name": "Second Wind", "desc": "30s: a drain returns the ball",
+		"cost": 5, "duration": 30.0,
 	},
 	"jackpot_charge": {
-		"name": "Jackpot Charge", "desc": "This stage: the first hit of each ball scores x10", "cost": 5,
+		"name": "Jackpot Charge", "desc": "12s: every hit also pays a flat 500",
+		"cost": 5, "duration": 12.0,
+	},
+	## The one the whole scheme was worth building for. Slowing time is the most
+	## powerful thing you can hand a player in a real-time game, so it is also
+	## the shortest and the dearest -- six seconds is enough to save one ball you
+	## had already lost, and not enough to play the game in.
+	"slow_ball": {
+		"name": "Slow Ball", "desc": "6s: everything runs at 55% speed",
+		"cost": 7, "duration": 6.0,
+	},
+	## Instant, because a MULT floor is not a state you can be in for 20 seconds
+	## -- it is a thing that either happened or did not.
+	"surge": {
+		"name": "Surge", "desc": "MULT jumps to at least x3, now",
+		"cost": 6, "duration": 0.0,
+	},
+	"extra_ball": {
+		"name": "Extra Ball", "desc": "One more ball this stage",
+		"cost": 6, "duration": 0.0,
 	},
 }
 
