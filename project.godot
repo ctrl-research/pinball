@@ -23,6 +23,7 @@ boot_splash/bg_color=Color(0.043, 0.039, 0.063, 1)
 
 Run="*res://src/autoload/run.gd"
 Sfx="*res://src/autoload/sfx.gd"
+Style="*res://src/autoload/style.gd"
 Crt="*res://src/autoload/crt.gd"
 
 [display]

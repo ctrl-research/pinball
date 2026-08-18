@@ -79,6 +79,12 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
 - **Screen layout lives in `cabinet.gd`.** Panels are positioned relative to the
   machine, so there is one source for it. `Cabinet.TOP_SCALE` is shared with the
   shader and the two must agree, or the rails stop lining up with the playfield.
+- **Font sizes should be multiples of 8.** Silkscreen is drawn on an 8px grid;
+  off-grid sizes resample and lose columns (at 7px the W reads as a different
+  glyph). The typeface is set once on the default theme in
+  `src/autoload/style.gd` — note that `ThemeDB.fallback_font` alone does
+  nothing, because the default theme ships its own `default_font` and a theme
+  always wins over the fallback.
 - **Building a Label in code: set `autowrap_mode` before `size`.** A Label grows
   to its own minimum size, and an unwrapped Label's minimum width is the full
   width of its text — setting autowrap afterwards is too late, and a long line
