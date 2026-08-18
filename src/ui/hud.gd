@@ -93,7 +93,9 @@ func _input(event: InputEvent) -> void:
 		return
 	if not event.is_pressed() or event.is_echo():
 		return
-	if event.is_action("ui_accept") or event.is_action("plunge"):
+	# ui_accept only. The plunger key used to double as "proceed", which meant a
+	# tap meant to dismiss a screen also charged the plunger on the frame after.
+	if event.is_action("ui_accept"):
 		confirmed.emit()
 		# Null while the tree is being torn down, which an event injected on the
 		# same frame as a scene change or a quit can land in.
@@ -377,8 +379,7 @@ func show_intro() -> void:
 		boss_line,
 	])
 
-	_overlay_body.add_child(_body_line("", INK))
-	_overlay_body.add_child(_body_line("SPACE to start", INK))
+	_add_continue("START")
 
 
 func _head_centred(text: String) -> Label:
@@ -391,9 +392,8 @@ func show_cleared(payout: Array) -> void:
 	var lines: Array = ["Scored %s against %s" % [_commas(Run.score), _commas(Run.target)], ""]
 	for item in payout:
 		lines.append("%s   +$%d" % [str(item["label"]), int(item["amount"])])
-	lines.append("")
-	lines.append("SPACE for the shop")
 	_open("VICTORY", lines)
+	_add_continue("TO THE SHOP")
 
 
 ## Two columns: what is for sale, and what you already own with a price on it.
@@ -439,7 +439,8 @@ func show_shop(offers: Array) -> void:
 		if Run.consumables[i] != "":
 			own_col.add_child(_sell_button("consumable", Run.consumables[i], i))
 
-	_overlay_body.add_child(_body_line("Click to buy or sell.  SPACE to move on.", DIM))
+	_overlay_body.add_child(_body_line("Click to buy or sell.", DIM))
+	_add_continue("NEXT BLIND")
 
 
 func _head(text: String) -> Label:
@@ -514,17 +515,15 @@ func show_lost() -> void:
 		"Ante %d, %s" % [Run.ante, Catalog.BLIND_NAME[Run.blind]],
 		"Scored %s, needed %s" % [_commas(Run.score), _commas(Run.target)],
 		"Short by %s." % _commas(Run.target - Run.score),
-		"",
-		"SPACE for the menu",
 	])
+	_add_continue("MENU")
 
 
 func show_won() -> void:
 	_open("MACHINE BEATEN", [
 		"All 8 antes cleared.",
-		"",
-		"SPACE for the menu",
 	])
+	_add_continue("MENU")
 
 
 func _open(title: String, lines: Array) -> void:
@@ -535,6 +534,30 @@ func _open(title: String, lines: Array) -> void:
 	for line in lines:
 		_overlay_body.add_child(_body_line(str(line), INK))
 	_overlay.visible = true
+
+
+## The button every screen ends on.
+##
+## Added last, after each screen's own content, and given focus so the keyboard
+## still works -- Godot routes ui_accept to the focused control, so this is one
+## affordance rather than a button and a separate key binding to keep in step.
+func _continue_button(label: String) -> Button:
+	var b := Button.new()
+	b.text = label
+	b.add_theme_font_size_override("font_size", 12)
+	b.custom_minimum_size = Vector2(160.0, 26.0)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	b.pressed.connect(confirmed.emit)
+	return b
+
+
+func _add_continue(label: String) -> void:
+	_overlay_body.add_child(_body_line("", INK))
+	var b := _continue_button(label)
+	_overlay_body.add_child(b)
+	# Deferred because a Control cannot take focus in the same frame it enters
+	# the tree.
+	b.grab_focus.call_deferred()
 
 
 func _body_line(text: String, colour: Color) -> Label:

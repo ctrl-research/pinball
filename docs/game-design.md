@@ -480,6 +480,19 @@ inserts, a segmented-LED score readout on the panel.
   pitch-sweep-plus-noise generator. A solid-state cabinet's whole voice is
   decaying tones and bursts of noise, which is about twenty lines of
   arithmetic, and it keeps binary blobs that cannot be diffed out of the repo.
+- **The whole screen sits behind a CRT.** `src/ui/crt.gdshader` adds curvature,
+  scanlines, an aperture grille, chromatic fringing and a vignette as a
+  full-screen pass — over the cabinet and both panels, not just the playfield,
+  because a monitor is in front of everything. Applying it to the playfield
+  alone would put the panels outside the glass, which reads as a filter on part
+  of a game rather than as a game on a CRT.
+
+  Every parameter is deliberately understated, and it is toggled with **F1**.
+  The panels carry 7pt text, and a shader that makes the score unreadable has
+  bought atmosphere with the one thing the player actually needs. The curvature
+  is the mildest setting of all, because it sits on top of the playfield's own
+  perspective warp and two distortions arguing with each other look like a bug.
+
 - **Art is not pixel art yet.** Everything on the playfield is currently drawn
   from the same `TableLayout` numbers that generate its collision, at 640×360
   with nearest filtering. That is chunky and readable and it cannot drift out
