@@ -62,6 +62,16 @@ jobs:
           ./godot --headless --path . tests/run_test.tscn 2>&1 | tee -a build.log
           grep -q "RUN_TEST_OK" build.log
 
+      # Lane routing, asserted deliberately rather than sampled. The bot below
+      # cannot be relied on to send a ball down a specific lane, and it took a
+      # human playing to notice that the inlane fed the drain -- so the one
+      # bug that made the game unplayable gets its own test.
+      - name: Inlane / outlane routing test
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . --quit-after 3000 tests/inlane_test.tscn 2>&1 | tee -a build.log
+          grep -q "INLANE_TEST_OK" build.log
+
       # A bot playing the real scene: physics, state machine and HUD. Asserts a
       # floor on what it reaches (a ball served, a point scored, the shop
       # opened) so losing coverage fails the build instead of quietly passing.

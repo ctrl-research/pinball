@@ -151,6 +151,9 @@ def main():
     for poly in data["outlanes"]:
         c.polygon([pt(p) for p in poly], LANE)
 
+    for poly in data.get("solids", []):
+        c.polygon([pt(p) for p in poly], (72, 76, 112))
+
     for tri in data["slingshots"]:
         c.polygon([pt(p) for p in tri], (46, 41, 64))
         c.polyline([pt(p) for p in tri] + [pt(tri[0])], 2 * s, RUBBER)
