@@ -75,6 +75,12 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
 - Both tests must keep printing their sentinel (`RUN_TEST_OK` / `SIM_OK`). CI
   greps for them, so a test that exits early silently fails the build rather
   than passing it. Adding a scoring rule means adding a case to `run_test.gd`.
+- **Browser-level input hardening lives in `export_presets.cfg`**, as
+  `html/head_include`. It blocks pinch-zoom (ctrl+wheel and `gesture*`),
+  overscroll, and page scroll, and puts focus back on the canvas if it drifts.
+  Godot only preventDefaults keys that reach the canvas, so anything that moves
+  focus or the visual viewport hands the keyboard back to the browser. If the
+  view ever seems to pan or zoom on its own, start there.
 - Versioning: bare `X.Y.Z`, no `v` prefix. `MAJOR.MINOR` from `./VERSION`.
 - Branch protection: never push directly to `main`; all changes via PR.
 - Commit style: conventional commits, see `CONTRIBUTING.md`.
