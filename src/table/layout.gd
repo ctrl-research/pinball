@@ -22,6 +22,9 @@ const WIDTH := 280.0
 const HEIGHT := 344.0
 
 const WALL_THICKNESS := 6.0
+
+## How far the solid cap behind the arch extends past the playfield.
+const ARCH_CAP_MARGIN := 40.0
 const BALL_RADIUS := 4.0
 
 ## The lower playfield is bounded by the left wall and the plunger-lane divider,
@@ -230,11 +233,19 @@ static func shift(pts: PackedVector2Array, dy: float) -> PackedVector2Array:
 
 
 ## The top arch, as a polyline running left-to-right along its inside face.
-static func arch_polyline(steps: int = 32) -> PackedVector2Array:
+##
+## The step count is a containment parameter, not a smoothness one. The arch is
+## sampled at even angles, so near its ends -- where it is steepest -- a segment
+## covers the most vertical distance, and a ball arriving there meets the
+## longest, flattest approximation of a curve that is nearly vertical. At 32
+## steps the containment test could squeeze a ball through the right end and out
+## of the cabinet entirely.
+static func arch_polyline(steps: int = 96, bias: float = 0.0) -> PackedVector2Array:
 	var pts := PackedVector2Array()
 	for i in steps + 1:
 		var t: float = PI * (1.0 - float(i) / float(steps))
-		pts.append(ARCH_CENTRE + Vector2(ARCH_RX * cos(t), -ARCH_RY * sin(t)))
+		pts.append(ARCH_CENTRE + Vector2(
+			(ARCH_RX + bias) * cos(t), -(ARCH_RY + bias) * sin(t)))
 	return pts
 
 
@@ -296,11 +307,11 @@ static func outlane_polys(mouth_shift: float = 0.0) -> Array:
 	return [left, mirror_all(left)]
 
 
-## Every static wall on the table, as polylines to be stroked into collision.
+## Every stroked wall on the table.
+##
+## The arch is *not* here. It is a solid cap instead -- see arch_cap_polygon().
 static func walls(_mouth_shift: float = 0.0) -> Array:
 	var w: Array = []
-
-	w.append(arch_polyline())
 
 	# Left cabinet wall, straight down past the drain. It is the outlane's outer
 	# boundary the whole way -- no funnel, because a funnel here would steer
@@ -334,9 +345,45 @@ static func walls(_mouth_shift: float = 0.0) -> Array:
 	return w
 
 
-## Filled parts of the playfield, as polygons. Only the two dividers so far.
+## Everything above the arch, as one solid.
+##
+## The arch used to be a stroked 6px wall and the ball could get out through the
+## top of it. Thickening the stroke made it *worse*: offsetting a polyline by a
+## large delta along a tight curve folds the ribbon over itself, and the
+## resulting self-intersecting polygon collides with less than the thin one did.
+##
+## A thin wall was the wrong tool. Nothing above the arch is playfield, so the
+## whole region can simply be solid -- there is no thickness to tunnel through,
+## no offset geometry to degenerate, and no pocket outside the arch for a ball
+## to get stuck in. The lower edge is the arch's inner face, so the surface the
+## ball actually touches is unchanged.
+static func arch_cap_polygon() -> PackedVector2Array:
+	var poly := PackedVector2Array()
+	var inner := WALL_THICKNESS * 0.5
+	var steps := 96
+	for i in steps + 1:
+		var t: float = PI * (1.0 - float(i) / float(steps))
+		poly.append(ARCH_CENTRE + Vector2(
+			(ARCH_RX - inner) * cos(t), -(ARCH_RY - inner) * sin(t)))
+	var top := -ARCH_CAP_MARGIN
+	var right := WIDTH + ARCH_CAP_MARGIN
+	var left := -ARCH_CAP_MARGIN
+	poly.append(Vector2(right, ARCH_CENTRE.y))
+	poly.append(Vector2(right, top))
+	poly.append(Vector2(left, top))
+	poly.append(Vector2(left, ARCH_CENTRE.y))
+	return poly
+
+
+## Filled parts of the playfield that are drawn as well as collided with.
 static func solids(mouth_shift: float = 0.0) -> Array:
 	return [divider_polygon(true, mouth_shift), divider_polygon(false, mouth_shift)]
+
+
+## Solids that are collided with but never drawn, because they live off the
+## playfield entirely.
+static func hidden_solids() -> Array:
+	return [arch_cap_polygon()]
 
 
 static func flipper_angles(is_left: bool) -> Vector2:

@@ -38,6 +38,8 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
 │   └── main_menu.gd
 ├── tests/
 │   ├── run_test.tscn        # scoring engine unit test -> RUN_TEST_OK
+│   ├── containment_test.tscn # the ball cannot escape -> CONTAINMENT_OK
+│   ├── inlane_test.tscn     # lane routing -> INLANE_TEST_OK
 │   └── headless_sim.tscn    # bot plays the real scene -> SIM_OK
 └── tools/                   # dev only; excluded from the export
     ├── dump_layout.tscn     # prints the generated playfield as JSON
@@ -103,6 +105,20 @@ Change these only deliberately, and re-run the headless sim afterwards:
 - **Ball CCD is `CCD_MODE_CAST_SHAPE` and `MAX_SPEED` is 900px/s** — just under
   a ball diameter per tick at 120Hz. Raising the speed without raising the tick
   rate is how balls escape the table.
+- **Do not use a thin stroked wall where the ball arrives head-on at speed.**
+  The arch was one, and the ball could punch through the apex and leave the
+  cabinet. Thickening the stroke made it *worse*: `Geometry2D.offset_polyline`
+  with a large delta along a tight curve folds the ribbon over itself, and a
+  self-intersecting polygon collides with less than a thin one. Where there is
+  nothing playable behind a boundary, make the whole region a solid polygon
+  instead — no thickness to tunnel, no offset geometry to degenerate, and no
+  pocket behind it for a ball to get stuck in. `arch_cap_polygon()` is the
+  pattern.
+- **`tests/containment_test.tscn` must keep passing.** It fires a ball at every
+  wall from every angle at the speed clamp with the flippers hammering. The
+  flippers are not incidental: a solenoid-speed kinematic body squeezing a ball
+  against a wall is the classic way a pinball escapes, and the same test without
+  them found nothing.
 - **The ball's own restitution is 0.0.** Godot combines bounce by taking the
   maximum, so a bouncy ball makes every surface as lively as the liveliest one
   and the table reads as a uniform trampoline.

@@ -18,7 +18,7 @@ func _ready() -> void:
 		"size": [TableLayout.WIDTH, TableLayout.HEIGHT],
 		"wall_thickness": TableLayout.WALL_THICKNESS,
 		"ball_radius": TableLayout.BALL_RADIUS,
-		"walls": _lines(TableLayout.walls(MOUTH_SHIFT)),
+		"walls": _lines(TableLayout.walls(MOUTH_SHIFT) + [TableLayout.arch_polyline()]),
 		"outlanes": _lines(TableLayout.outlane_polys(MOUTH_SHIFT)),
 		"solids": _lines(TableLayout.solids(MOUTH_SHIFT)),
 		"slingshots": [
