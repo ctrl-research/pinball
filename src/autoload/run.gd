@@ -41,6 +41,13 @@ var target := 0
 var balls_left := 0
 var boss_id := ""
 var stage_mult_bonus := 0.0  ## Drop Devotion, and anything else that persists a stage
+## True once the target has been crossed, with the balls that were still in hand
+## at that moment. A stage now always runs its full complement of balls, so
+## `balls_left` is zero by the time it is scored -- but "how many balls you did
+## not need" is still the thing the payout should reward, and this is the only
+## place it exists.
+var target_met := false
+var balls_left_at_target := 0
 var _ball_saved_this_stage := false
 
 # --- Ball-scoped state --------------------------------------------------------
@@ -91,6 +98,8 @@ func begin_stage() -> void:
 	target = Catalog.blind_target(ante, blind)
 	balls_left = balls_for_stage()
 	stage_mult_bonus = 0.0
+	target_met = false
+	balls_left_at_target = 0
 	_ball_saved_this_stage = false
 	boss_id = ""
 	if blind == Catalog.BOSS:
@@ -152,14 +161,48 @@ func run_lost() -> bool:
 	return balls_left <= 0 and not stage_won()
 
 
+## How far past the target you finished, as a multiplier on the blind's reward.
+## x1 for exactly meeting it, x2 for doubling it, capped at x5.
+##
+## A multiplier rather than a flat bonus because the reward should scale with the
+## build: an ante 8 boss beaten twice over is a far harder thing than an ante 1
+## small blind beaten twice over, and a flat bonus pays them the same. It also
+## reuses the vocabulary the game already has -- everything else here multiplies
+## too.
+##
+## Capped because the tail is unbounded. A single good ball with a stacked MULT
+## can exceed an early target by an order of magnitude, and paying for all of it
+## would make ante 1 fund the whole run.
+const PAYOUT_MULT_CAP := 5
+
+
+func payout_multiplier() -> int:
+	if target <= 0:
+		return 1
+	return clampi(int(floor(float(score) / float(target))), 1, PAYOUT_MULT_CAP)
+
+
 ## Tokens paid out for clearing the current stage, itemised for the results
-## screen. Unused balls pay out for the same reason Balatro pays for unused
-## hands: it makes overkill on a small blind a strategy rather than a waste.
+## screen.
+##
+## Balls you never needed still pay, for the same reason Balatro pays for unused
+## hands: it keeps beating a small blind on one ball a strategy rather than a
+## waste, even though you now play the remaining balls anyway.
 func stage_payout() -> Array:
 	var items: Array = []
-	items.append({"label": Catalog.BLIND_NAME[blind], "amount": Catalog.BLIND_REWARD[blind]})
-	if balls_left > 0:
-		items.append({"label": "%d ball(s) unused" % balls_left, "amount": balls_left})
+	var base: int = Catalog.BLIND_REWARD[blind]
+	items.append({"label": Catalog.BLIND_NAME[blind], "amount": base})
+
+	var mult := payout_multiplier()
+	if mult > 1:
+		# Shown as the *extra* it earned, so the column still sums to the total.
+		items.append({"label": "Overkill x%d" % mult, "amount": base * (mult - 1)})
+
+	# Minus one, because the ball in hand when the target fell was needed.
+	var spare := maxi(0, balls_left_at_target - 1)
+	if spare > 0:
+		items.append({"label": "%d ball(s) not needed" % spare, "amount": spare})
+
 	var interest := mini(5, tokens / 5)
 	if interest > 0:
 		items.append({"label": "Interest", "amount": interest})
@@ -255,6 +298,10 @@ func _bank(points: int) -> void:
 	if points <= 0:
 		return
 	score += points
+	if not target_met and score >= target:
+		target_met = true
+		balls_left_at_target = balls_left
+		toast.emit("TARGET MET - PLAY ON FOR BONUS")
 	if has_relic("penny_slot"):
 		_penny_progress += points
 		while _penny_progress >= 1000:

@@ -103,10 +103,29 @@ advances and the numbers get worse. Lose a stage and the run is over.
 
 | | |
 | --- | --- |
-| **Stage** | Beat a score target using 3 balls. |
+| **Stage** | Play all 3 balls. Beat the score target by the end of them. |
 | **Ball** | Plunge, play, drain. The playfield MULT resets between balls. |
+| **Judged** | Once, when the last ball is gone: **victory** or **defeat**. |
 | **Clear** | Bank tokens, take a reward, visit the shop. |
-| **Fail** | Balls exhausted below target → run over. |
+| **Fail** | Last ball drained below target → run over. |
+
+**A stage always runs its full complement of balls.** Crossing the target does
+not end it; it only means the rest of the stage is played for the payout
+multiplier instead of for survival.
+
+An earlier version ended the stage the instant the target fell, on the argument
+that crossing it mid-ball is the moment of victory and making the player wait
+throws away the best beat in the stage. That reasoning is not wrong, but it
+costs more than it buys. Ending early means a good ball is *punished* — the
+better you are, the sooner the machine takes the ball off you — and it makes the
+stage length unpredictable, so the player can never plan across balls. Playing
+all three makes a stage a fixed, complete arc: you always know how much runway
+is left, and a great first ball buys you two balls of pure upside instead of
+ending the round.
+
+The cost of that choice is that the balls after the target is met would be a
+chore — the stage is decided and nothing you do matters. The payout multiplier
+below exists to answer that, and it is the reason the rule works at all.
 
 Score targets follow Balatro's ante curve, because it is a curve that is known
 to work — it roughly triples early and then stretches:
@@ -152,11 +171,29 @@ a mistake, with a hard punishment for greed.
 Tokens (`$`) are earned on a stage clear and spent in the shop.
 
 - Base reward per blind: small `$3`, big `$4`, boss `$5`
-- `$1` per unused ball — do not need the third ball, get paid for it
+- **Overkill multiplier**: the base reward is multiplied by how many times over
+  you beat the target — ×2 for double, ×3 for triple, capped at **×5**
+- `$1` per ball you never needed — cross the target on ball one, get paid for
+  the two that follow
 - Interest: `$1` per `$5` held, capped at `$5`
 
-The unused-ball payout is the same lever as Balatro's unused hands: it makes
-overshooting a small blind on one ball an actual strategy rather than a waste.
+The overkill multiplier is what makes the balls after the target worth playing.
+Without it a stage would be decided halfway through and then continue anyway;
+with it, every ball after the target is a push-your-luck bet — keep shooting for
+a bigger multiplier, with a tilt still able to take away the MULT you were doing
+it with.
+
+It multiplies rather than adds because the reward should scale with the build.
+An ante 8 boss beaten twice over is a far harder thing than an ante 1 small
+blind beaten twice over, and a flat bonus pays them the same. It is capped
+because the tail is unbounded: one good ball on a stacked MULT can exceed an
+early target by an order of magnitude, and paying for all of it would let ante 1
+fund the entire run.
+
+The balls-not-needed payout is the same lever as Balatro's unused hands. It
+survives the "play all the balls" rule because what it counts is the balls you
+did not *need*, recorded at the moment the target fell — not the balls left
+over, which is now always zero.
 
 ## The build — five layers of modifier
 

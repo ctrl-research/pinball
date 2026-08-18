@@ -13,20 +13,23 @@ extends Node
 const GAME := preload("res://scenes/game.tscn")
 
 const TOTAL_FRAMES := 3600
-## The bot cannot be relied on to actually beat a 300-point blind, so at this
-## frame the stage is handed to it. Everything after this point -- results,
-## shop, the next intro, a rebuilt table -- is code that would otherwise never
-## run in CI.
-const FORCE_CLEAR_FRAME := 1500
 
-## After this the bot stops flipping entirely, and the ball is required to
-## drain. Flipping on a timer whenever the ball is low turns out to be a very
-## effective if stupid save, so without a deliberate hands-off phase the sim
-## can keep one ball alive for its whole run and never exercise the drain --
-## which is exactly how two separate ball-trap bugs survived earlier passes.
-const NO_FLIP_AFTER := 2600
-## Long enough to reach a full charge: the plunger fills in 0.71s of holding,
-## and a weak plunge dies in the orbit without reaching the playfield.
+## Where the stage is handed to the bot. It cannot be relied on to beat even a
+## 300-point blind, and everything after this point -- results, shop, the next
+## intro, a rebuilt table -- is code that would otherwise never run in CI.
+##
+## Since a stage now plays out all of its balls regardless, forcing the score is
+## no longer enough to end one: the balls have to run out too.
+const FORCE_CLEAR_FRAME := 1200
+
+## Windows where the bot deliberately keeps its hands off, so balls drain.
+## Flipping on a timer whenever the ball is low turns out to be a very effective
+## if stupid save, and without a hands-off phase the sim can keep one ball alive
+## for its whole run and never exercise a drain -- which is how two separate
+## ball-trap bugs survived earlier passes. The first window also drives the
+## forced stage to its end; the second is what the drain assertion rests on.
+const NO_FLIP_WINDOWS := [[1200, 1950], [2700, TOTAL_FRAMES]]
+
 const PLUNGE_HOLD := 120
 const FLIP_PERIOD := 8
 
@@ -70,6 +73,11 @@ func _process(_delta: float) -> void:
 			_forced = true
 			_score_before_force = Run.score
 			Run.score = Run.target
+			Run.target_met = true
+			Run.balls_left_at_target = Run.balls_left
+			# One ball left, so the next drain finishes the stage rather than
+			# serving another.
+			Run.balls_left = 1
 		_play()
 	else:
 		_release_all()
@@ -111,7 +119,7 @@ func _play() -> void:
 	Input.action_release("plunge")
 	_plunge_hold = 0
 
-	var flipping := int(_frame / FLIP_PERIOD) % 2 == 0 and _frame < NO_FLIP_AFTER
+	var flipping := int(_frame / FLIP_PERIOD) % 2 == 0 and _hands_on()
 	if ball.position.y > 240.0 and flipping:
 		if ball.position.x < TableLayout.LOWER_CENTRE:
 			Input.action_press("flip_left")
@@ -120,6 +128,14 @@ func _play() -> void:
 	else:
 		Input.action_release("flip_left")
 		Input.action_release("flip_right")
+
+
+## False inside any of the hands-off windows.
+func _hands_on() -> bool:
+	for w in NO_FLIP_WINDOWS:
+		if _frame >= int(w[0]) and _frame < int(w[1]):
+			return false
+	return true
 
 
 func _release_all() -> void:
@@ -155,8 +171,7 @@ func _finish() -> void:
 	if _balls_served < 2:
 		problems.append("only %d ball(s) were served" % _balls_served)
 	if _drains < 1:
-		problems.append("no ball drained even with the flippers held off for %d frames"
-			% (TOTAL_FRAMES - NO_FLIP_AFTER))
+		problems.append("no ball drained even with hands-off windows %s" % [NO_FLIP_WINDOWS])
 	for required in [Game.State.INTRO, Game.State.PLAYING, Game.State.SHOP]:
 		if not _states_seen.has(required):
 			problems.append("never reached state %d" % required)

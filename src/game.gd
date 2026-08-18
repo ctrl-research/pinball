@@ -37,16 +37,6 @@ func _ready() -> void:
 	_enter_intro()
 
 
-func _process(_delta: float) -> void:
-	if state != State.PLAYING:
-		return
-	# Checked live rather than at the drain: crossing the target mid-ball is
-	# the moment of victory, and making the player wait for the ball to die
-	# before telling them so would throw away the best beat in the stage.
-	if Run.stage_won():
-		_enter_cleared()
-
-
 # --- States -------------------------------------------------------------------
 
 
@@ -104,12 +94,16 @@ func _on_drained(via_outlane: bool) -> void:
 	if Run.consume_ball(via_outlane):
 		_start_stage()  # a relic put the ball back
 		return
-	if Run.stage_won():
-		_enter_cleared()
-	elif Run.balls_left <= 0:
-		_enter_lost()
-	else:
+	# A stage always plays out its full complement of balls. Crossing the target
+	# does not end it -- it only means the rest of the stage is played for the
+	# overkill bonus instead of for survival. Win or lose is decided once, when
+	# the last ball is gone.
+	if Run.balls_left > 0:
 		_start_stage()
+	elif Run.stage_won():
+		_enter_cleared()
+	else:
+		_enter_lost()
 
 
 func _on_confirmed() -> void:
