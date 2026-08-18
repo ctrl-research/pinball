@@ -62,16 +62,29 @@ func setup(is_left: bool) -> void:
 func _physics_process(delta: float) -> void:
 	var want := Input.is_action_pressed(action) and not disabled and not Run.tilted
 	var step := delta / TableLayout.FLIPPER_SWEEP_TIME
+	var was := _t
 	_t = clampf(_t + (step if want else -step), 0.0, 1.0)
 	# lerp_angle takes the short way round, which for both flippers is the
 	# 58-degree sweep and never the 302-degree one.
 	rotation = lerp_angle(rest_angle, up_angle, _t)
+	# Rotating the node alone would redraw fine, but the side face is offset
+	# against global down and so has to be recomputed as the bat turns.
+	if not is_equal_approx(was, _t):
+		queue_redraw()
 
 
 func _draw() -> void:
 	var length: float = get_meta("length", TableLayout.FLIPPER_LENGTH)
 	var r := TableLayout.FLIPPER_RADIUS
 	var body := Color(0.86, 0.24, 0.32) if not disabled else Color(0.32, 0.30, 0.36)
+	# The side face is offset in *global* down, not local: the flipper rotates
+	# and the light does not, so an offset along the local axis would swing the
+	# shadow around with the sweep and read as the bat flapping rather than
+	# turning.
+	var down := Vector2(0.0, TableLayout.EXTRUDE).rotated(-rotation)
+	var side := body.darkened(0.62)
+	draw_line(down, Vector2(length, 0.0) + down, side, r * 2.0)
+	draw_circle(down, r, side)
 	draw_line(Vector2.ZERO, Vector2(length, 0.0), body, r * 2.0)
 	draw_circle(Vector2.ZERO, r, body)
 	draw_circle(Vector2(length, 0.0), r * 0.8, body)

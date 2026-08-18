@@ -9,7 +9,8 @@ relics, a shop after everything — poured into a pinball cabinet, with the
 tactile layer of *3D Pinball: Space Cadet* underneath it: flippers, plunger,
 nudge, tilt.
 
-See [docs/game-design.md](docs/game-design.md) for the full design.
+See [docs/game-design.md](docs/game-design.md) for the full design and
+[docs/roadmap.md](docs/roadmap.md) for what gets built in what order.
 
 ## Controls
 
@@ -102,10 +103,31 @@ src/
 │   ├── layout.gd     # the machine, as numbers
 │   ├── table.gd      # builds it; plunger, nudge, drain, boss hazards
 │   ├── ball.gd  flipper.gd  bumper.gd  slingshot.gd  target.gd  sensor.gd
-├── ui/hud.gd         # panel + every between-stage screen, built in code
+├── ui/
+│   ├── cabinet.gd            # rails, lockdown bar, backbox, screen layout
+│   ├── perspective.gdshader  # the trapezoid warp
+│   └── hud.gd                # both panels + every between-stage screen
 ├── game.gd           # the run as a state machine
 └── main_menu.gd
 ```
+
+### The 2.5D is a rendering trick, on purpose
+
+The playfield is rendered flat into a SubViewport and warped onto a trapezoid by
+a shader. **The simulation stays a plain top-down 2D world that has never heard
+of perspective** — so no ball can behave differently because of how it is drawn,
+which is the one property a pinball game cannot afford to lose. Every part is
+foreshortened for free, extrusions included.
+
+Solid parts are drawn twice: a dark side face offset toward the player, then the
+lit top face over it. The camera is at the near edge, so the only visible side
+face is the near one and the offset is always +y. Lamp inserts get no side face
+— they are flush with the wood, and half of what sells everything else as raised
+is that these are not.
+
+`Cabinet` owns the screen layout as well as the chrome, because the panel
+positions are defined by where the machine is and there should be one answer to
+that rather than two that drift.
 
 ### Physics notes
 
@@ -126,28 +148,29 @@ src/
 
 ## Status
 
-Milestone 1 (vertical slice) and most of milestone 2 (the run loop) are in:
-one table, the full 8-ante structure, 14 relics, 4 table mods, 8 boss blinds,
-target levels, and the shop.
+The run loop is complete: one table, the full 8-ante structure, 14 relics, 4
+table mods, 8 boss blinds, target levels, and the shop. The presentation is
+2.5D — perspective playfield, extruded parts, and a drawn cabinet with rails, a
+lockdown bar and a backbox.
 
 It has been run: both tests pass under Godot 4.6.3, and the web export has been
 loaded in a browser through the menu, a blind intro, a plunge and a ball in
-play. Along the way that testing found and fixed four real bugs — two ball
-traps that made the table unable to drain, a plunger that ignored a tap, and a
-menu that could start two runs at once.
+play. That testing found and fixed six real bugs — two ball traps that made the
+table unable to drain, friction roughly 4× too high, a plunger that ignored a
+tap, a menu that could start two runs at once, and a `Label` built in the wrong
+order that ran its text off the screen.
 
-Known gaps, in the order they matter:
+See [docs/roadmap.md](docs/roadmap.md) for what comes next. In short:
 
 1. **No human has played it.** Everything above is a bot and a screenshot,
    which proves the table *works* and says nothing about whether it is *fun*.
-   Flipper sweep, plunge power, slingshot kick, gravity and the drain gap are
-   reasoned from real-machine numbers, not tuned by feel. Expect the first real
-   session to be a tuning pass; the constants that matter are all at the top of
-   `layout.gd`.
-2. **It is not pixel art yet.** The playfield is drawn from its own collision
-   geometry, which is chunky and readable and guaranteed in sync, but it is
-   low-res vector shapes rather than a pixel grid. See the design doc's
-   milestone 4.
+   That is the roadmap's Phase 0 and the only hard gate in it — flipper sweep,
+   plunge power, slingshot kick, gravity and the drain gap are all reasoned
+   from real-machine numbers rather than tuned by feel, and the constants are
+   at the top of `layout.gd`.
+2. **It is not pixel art yet.** Parts are drawn from the same data that
+   generates their collision — chunky, readable, guaranteed in sync, but
+   low-res vector shapes rather than a pixel grid.
 3. **The table is sparse.** Three bumpers, three drop targets, two standups,
    two rollovers, a spinner. Enough to prove the scoring engine, thin for a
    machine you are meant to learn by heart.

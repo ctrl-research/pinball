@@ -9,8 +9,10 @@ extends Node2D
 
 signal drained(via_outlane: bool)
 
-const BG := Color(0.086, 0.078, 0.118)
+const BG_FAR := Color(0.052, 0.048, 0.078)
+const BG_NEAR := Color(0.105, 0.096, 0.145)
 const WALL_COLOUR := Color(0.42, 0.44, 0.62)
+const WALL_SIDE := Color(0.17, 0.18, 0.27)
 const LANE_COLOUR := Color(0.14, 0.15, 0.23)
 
 ## How far the outlane mouth moves for each effect that acts on it. The boss
@@ -275,7 +277,7 @@ func _build_fog() -> void:
 	_fog = ColorRect.new()
 	_fog.position = Vector2.ZERO
 	_fog.size = Vector2(TableLayout.WIDTH, 130.0)
-	_fog.color = Color(BG.r, BG.g, BG.b, 0.97)
+	_fog.color = Color(BG_FAR.r, BG_FAR.g, BG_FAR.b, 0.97)
 	_fog.z_index = 20
 	_fog.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fog.visible = Run.boss_active("fog")
@@ -491,7 +493,7 @@ func set_fog(on: bool) -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, Vector2(TableLayout.WIDTH, TableLayout.HEIGHT)), BG)
+	_draw_playfield()
 
 	# The lanes the ball travels are painted a shade darker than the playfield
 	# so the routes read at a glance -- inserts do this job on a real table and
@@ -499,6 +501,12 @@ func _draw() -> void:
 	for poly in _outlane_polys:
 		draw_colored_polygon(poly, LANE_COLOUR)
 
+	# Side faces first, then tops over them. Two passes over the whole set
+	# rather than side-then-top per wall, so that where two walls overlap the
+	# near one's top face still covers the far one's side.
+	for line in _wall_lines:
+		draw_polyline(TableLayout.shift(line, TableLayout.WALL_EXTRUDE),
+			WALL_SIDE, TableLayout.WALL_THICKNESS)
 	for line in _wall_lines:
 		draw_polyline(line, WALL_COLOUR, TableLayout.WALL_THICKNESS)
 
@@ -507,6 +515,24 @@ func _draw() -> void:
 	draw_line(TableLayout.GATE_A, TableLayout.GATE_B, Color(0.34, 0.36, 0.50), 2.0)
 
 	_draw_plunger()
+
+
+## The wood, lit from the near end.
+##
+## Banded rather than smoothly graded: a 2D draw call has no gradient, and at
+## this resolution a dozen steps is indistinguishable from one. The gradient is
+## doing real work -- with a flat playfield the perspective warp alone reads as
+## a picture that has been squashed, and the falloff toward the far end is what
+## makes it read as distance instead.
+func _draw_playfield() -> void:
+	# A few pixels past the chute tips so the render target has no bare edge.
+	var height := TableLayout.HEIGHT + TableLayout.CHUTE_OVERRUN + 6.0
+	var bands := 14
+	for i in bands:
+		var t := float(i) / float(bands - 1)
+		var y := height * float(i) / float(bands)
+		draw_rect(Rect2(0.0, y, TableLayout.WIDTH, height / float(bands) + 1.0),
+			BG_FAR.lerp(BG_NEAR, t))
 
 
 func _draw_plunger() -> void:

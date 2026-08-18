@@ -6,22 +6,26 @@ extends Node2D
 
 enum State { INTRO, PLAYING, CLEARED, SHOP, LOST, WON }
 
-## Table on the left, panel on the right -- the Space Cadet arrangement. The y
-## leaves the chute tips (HEIGHT + CHUTE_OVERRUN = 350) inside the 360px
-## viewport with a few pixels to spare.
-const TABLE_ORIGIN := Vector2(16.0, 4.0)
-
 var state := State.INTRO
 var shop_offers: Array = []
 var table: Table
 var hud: Hud
+var cabinet: Cabinet
 
 
 func _ready() -> void:
+	cabinet = Cabinet.new()
+	add_child(cabinet)
+
+	# The table lives inside the cabinet's render target at its own origin, not
+	# at a screen position: where it ends up on screen is entirely the
+	# perspective shader's business now. `home_position` stays zero so a nudge
+	# still shakes the playfield within the machine rather than shaking the
+	# machine itself, which is the right way round -- you are hitting the table,
+	# not the cabinet.
 	table = Table.new()
-	table.home_position = TABLE_ORIGIN
-	table.position = TABLE_ORIGIN
-	add_child(table)
+	table.home_position = Vector2.ZERO
+	cabinet.mount(table)
 	table.drained.connect(_on_drained)
 
 	hud = Hud.new()

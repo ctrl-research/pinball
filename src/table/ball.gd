@@ -76,6 +76,12 @@ func _physics_process(delta: float) -> void:
 
 
 func _draw() -> void:
+	# The shadow is the single cheapest depth cue on the table: it is what
+	# separates a ball resting *on* the playfield from a disc painted on it,
+	# and it is the only thing that makes a ball airborne off a slingshot read
+	# as airborne.
+	draw_circle(TableLayout.BALL_SHADOW, RADIUS * 0.95, Color(0.0, 0.0, 0.0, 0.45))
+
 	# Drawn rather than sprited so the ball scales cleanly with the layout
 	# constants; the highlight is what sells it as a chrome sphere at 8px.
 	draw_circle(Vector2.ZERO, RADIUS, Color(0.78, 0.80, 0.86))
