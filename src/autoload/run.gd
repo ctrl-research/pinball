@@ -22,6 +22,10 @@ const MAX_TRINKETS := 5
 ## Three is enough to hold an answer for the boss you can see coming and still
 ## have to choose; five would mean never having to.
 const MAX_CONSUMABLES := 3
+## Per-slot stack ceiling. Three slots of five is a lot of held power already,
+## and a cap keeps the readout single-digit and hoarding bounded. Purely a
+## balance number -- nothing breaks if it moves.
+const MAX_STACK := 5
 const BASE_BALLS := 3
 const MAX_NUDGES := 2
 const NUDGE_RECHARGE := 5.0  # seconds per nudge
@@ -40,6 +44,13 @@ var trinkets: Array[String] = []
 ## a panicked double-tap would burn two items, and "my Slow Ball is 2" would
 ## never become muscle memory. A hole is the price of a stable binding.
 var consumables: Array[String] = ["", "", ""]
+## How many are in each slot. Invariant: consumables[i] == "" iff stacks[i] == 0.
+##
+## Parallel to `consumables` rather than an array of dictionaries because every
+## call site already indexes by slot, and a slot number is what the 1-3 keys
+## address. Kept honest by going through the helpers below rather than by being
+## touched directly.
+var consumable_stacks: Array[int] = [0, 0, 0]
 var mods: Array[String] = []
 var levels := {}  ## Catalog.Source -> int, absent means level 1
 var rng := RandomNumberGenerator.new()
@@ -444,15 +455,42 @@ func add_trinket(id: String) -> bool:
 
 ## Duplicates are allowed, unlike trinkets: holding two Ball Polish is a
 ## legitimate thing to want, and holding two of the same trinket is not.
+## Buying a second of something you already hold stacks it rather than taking a
+## second slot -- that is the whole point of holding three *kinds*.
 func add_consumable(id: String) -> bool:
-	var slot := consumables.find("")
+	var slot := _stackable_slot(id)
+	if slot < 0:
+		slot = consumables.find("")
 	if slot < 0:
 		return false
 	consumables[slot] = id
+	consumable_stacks[slot] += 1
 	consumables_changed.emit()
 	return true
 
 
+## An existing slot holding `id` with room left, or -1.
+func _stackable_slot(id: String) -> int:
+	for i in consumables.size():
+		if consumables[i] == id and consumable_stacks[i] < MAX_STACK:
+			return i
+	return -1
+
+
+## Removes one from a slot, clearing it if that was the last. Returns the id, or
+## "" if the slot was already empty.
+func _take_one(slot: int) -> String:
+	if slot < 0 or slot >= consumables.size() or consumables[slot] == "":
+		return ""
+	var id: String = consumables[slot]
+	consumable_stacks[slot] -= 1
+	if consumable_stacks[slot] <= 0:
+		consumable_stacks[slot] = 0
+		consumables[slot] = ""
+	return id
+
+
+## Slots in use, not items held -- it is what the "2/3" readout means.
 func consumable_count() -> int:
 	var n := 0
 	for id in consumables:
@@ -463,8 +501,10 @@ func consumable_count() -> int:
 
 func _clear_consumables() -> void:
 	consumables.clear()
+	consumable_stacks.clear()
 	for i in MAX_CONSUMABLES:
 		consumables.append("")
+		consumable_stacks.append(0)
 
 
 ## Fire a consumable, mid-ball, from the 1-3 keys.
@@ -477,7 +517,8 @@ func use_consumable(index: int) -> bool:
 		return false
 	var id: String = consumables[index]
 	var def: Dictionary = Catalog.CONSUMABLES[id]
-	consumables[index] = ""
+	# One at a time; the rest of the stack stays in the slot, on the same key.
+	_take_one(index)
 
 	match id:
 		"extra_ball":
@@ -504,11 +545,12 @@ func sell(kind: String, index: int) -> int:
 	if id == "":
 		return 0
 	var price := Catalog.sell_price(kind, id)
-	# Trinkets close up; consumable slots stay put, so selling leaves a hole.
+	# Trinkets close up. Consumables sell one off the stack and the slot stays
+	# put, emptying only when the last one goes.
 	if kind == "trinket":
 		list.remove_at(index)
 	else:
-		list[index] = ""
+		_take_one(index)
 	tokens += price
 	tokens_changed.emit()
 	if kind == "trinket":
@@ -525,7 +567,7 @@ func can_take(offer: Dictionary) -> bool:
 		"trinket":
 			return trinkets.size() < MAX_TRINKETS and not has_trinket(str(offer["id"]))
 		"consumable":
-			return consumables.has("")
+			return consumables.has("") or _stackable_slot(str(offer["id"])) >= 0
 	return true
 
 

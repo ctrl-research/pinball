@@ -338,7 +338,11 @@ func _refresh() -> void:
 		# is a mechanic the player has to be told about out of band.
 		if Run.consumables[i] != "":
 			var def: Dictionary = Catalog.CONSUMABLES[Run.consumables[i]]
-			text.text = "%d  %s" % [i + 1, str(def["name"]).to_upper()]
+			# The count is only shown when there is more than one; "x1" on every
+			# slot is noise that makes a real stack harder to spot.
+			var n: int = Run.consumable_stacks[i]
+			text.text = "%d  %s%s" % [
+				i + 1, str(def["name"]).to_upper(), "" if n <= 1 else "  x%d" % n]
 			text.add_theme_color_override("font_color", Color(0.55, 0.90, 0.95))
 			_consumable_slots[i].color = CONSUMABLE_SLOT
 		else:
@@ -493,7 +497,13 @@ func _sell_button(kind: String, id: String, index: int) -> Button:
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.clip_text = true
 	b.custom_minimum_size = Vector2(196.0, 0.0)
-	b.text = "%s   sell $%d" % [str(def["name"]), Catalog.sell_price(kind, id)]
+	var label := str(def["name"])
+	if kind == "consumable" and Run.consumable_stacks[index] > 1:
+		# Says "one" because a click sells one off the stack, not the lot.
+		label += " x%d" % Run.consumable_stacks[index]
+		b.text = "%s   sell one $%d" % [label, Catalog.sell_price(kind, id)]
+	else:
+		b.text = "%s   sell $%d" % [label, Catalog.sell_price(kind, id)]
 	b.tooltip_text = str(def["desc"])
 	b.pressed.connect(sold.emit.bind(kind, index))
 	return b
