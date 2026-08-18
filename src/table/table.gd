@@ -13,6 +13,9 @@ const BG_FAR := Color(0.052, 0.048, 0.078)
 const BG_NEAR := Color(0.105, 0.096, 0.145)
 const WALL_COLOUR := Color(0.42, 0.44, 0.62)
 const WALL_SIDE := Color(0.17, 0.18, 0.27)
+## Filled parts sit slightly darker than the stroked walls so the divider
+## reads as a piece of the playfield rather than a very fat wall.
+const SOLID_COLOUR := Color(0.28, 0.30, 0.44)
 const LANE_COLOUR := Color(0.14, 0.15, 0.23)
 
 ## How far the outlane mouth moves for each effect that acts on it. The boss
@@ -32,6 +35,7 @@ var home_position := Vector2.ZERO
 var active := false
 
 var _wall_lines: Array = []
+var _solid_polys: Array = []
 var _outlane_polys: Array = []
 var _drop_targets: Array[Target] = []
 var _rollovers: Array[Sensor] = []
@@ -77,6 +81,7 @@ func build() -> void:
 		mouth += OUTLANE_GUARD_SHIFT
 
 	_wall_lines = TableLayout.walls(mouth)
+	_solid_polys = TableLayout.solids(mouth)
 	_outlane_polys = TableLayout.outlane_polys(mouth)
 
 	_build_walls()
@@ -110,6 +115,12 @@ func _build_walls() -> void:
 			var cp := CollisionPolygon2D.new()
 			cp.polygon = poly
 			body.add_child(cp)
+	# Filled regions go in as-is. CollisionPolygon2D decomposes a concave
+	# polygon into convex pieces itself, which is what the divider wedge needs.
+	for poly in _solid_polys:
+		var cp := CollisionPolygon2D.new()
+		cp.polygon = poly
+		body.add_child(cp)
 	add_child(body)
 
 
@@ -309,6 +320,13 @@ func _add_ball(at: Vector2, in_lane: bool) -> Ball:
 	return b
 
 
+## Drop a ball at a given spot on the playfield. Exists for tests: the inlane
+## regression test needs to place a ball on a specific lane and watch where it
+## ends up, which serve_ball() cannot express.
+func spawn_ball_at(at: Vector2) -> Ball:
+	return _add_ball(at, false)
+
+
 func _spawn_extra_ball() -> void:
 	# Dropped into the arch rather than the lane: a multiball that has to be
 	# plunged is not a multiball.
@@ -504,11 +522,16 @@ func _draw() -> void:
 	# Side faces first, then tops over them. Two passes over the whole set
 	# rather than side-then-top per wall, so that where two walls overlap the
 	# near one's top face still covers the far one's side.
+	for poly in _solid_polys:
+		draw_colored_polygon(TableLayout.shift(poly, TableLayout.WALL_EXTRUDE), WALL_SIDE)
 	for line in _wall_lines:
 		draw_polyline(TableLayout.shift(line, TableLayout.WALL_EXTRUDE),
 			WALL_SIDE, TableLayout.WALL_THICKNESS)
 	for line in _wall_lines:
 		draw_polyline(line, WALL_COLOUR, TableLayout.WALL_THICKNESS)
+	for poly in _solid_polys:
+		draw_colored_polygon(poly, SOLID_COLOUR)
+		draw_polyline(poly, WALL_COLOUR, 1.5)
 
 	# Drawn thin and pale whatever its state: a gate you can see swinging shut
 	# reads as a bug, and on a real machine it is a wire flap you barely notice.

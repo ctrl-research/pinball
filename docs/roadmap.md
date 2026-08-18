@@ -80,6 +80,15 @@ enough to prove the scoring engine and not enough to have a favourite shot.
 - **Relic pool to ~30** — enough that two runs diverge. The current 14 all
   read as "more points"; the pool needs relics that change *routing* (rewards
   for orbits, for combos, for keeping a ball above the slingshots).
+- **Coils and ball mods** — the two new modifier layers, designed in
+  `game-design.md`. Coils are the survival axis (they never add a point, they
+  buy chances to score); ball mods are the only layer that asks the player a
+  question *during* a stage rather than in the shop. Together they create the
+  build tension the game currently lacks: score axes make a good ball worth
+  more, survival axes make good balls more likely, and a run that buys only one
+  loses.
+  `Magna-Hold` (cradling) is the highest-value single item in either list — it
+  is the difference between reacting and playing.
 - **Second table** — worth building only once the modifier layers are proven,
   because every table has to be balanced against all of them.
 - **Boss blinds that use the geometry** — the current eight mostly edit

@@ -20,6 +20,7 @@ func _ready() -> void:
 		"ball_radius": TableLayout.BALL_RADIUS,
 		"walls": _lines(TableLayout.walls(MOUTH_SHIFT)),
 		"outlanes": _lines(TableLayout.outlane_polys(MOUTH_SHIFT)),
+		"solids": _lines(TableLayout.solids(MOUTH_SHIFT)),
 		"slingshots": [
 			_pts(TableLayout.slingshot(true)["tri"]),
 			_pts(TableLayout.slingshot(false)["tri"]),

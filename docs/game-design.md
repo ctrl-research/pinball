@@ -158,7 +158,37 @@ Tokens (`$`) are earned on a stage clear and spent in the shop.
 The unused-ball payout is the same lever as Balatro's unused hands: it makes
 overshooting a small blind on one ball an actual strategy rather than a waste.
 
-## The build — three layers of modifier
+## The build — five layers of modifier
+
+Balatro works because its categories are not five flavours of the same thing.
+Jokers bend **rules**, planets raise the **scoring table**, tarots edit the
+**deck**, vouchers change the **run**. Each answers a different question, so
+owning one never feels like a worse version of owning another.
+
+Pinball has its own natural set of objects to hang categories on, and they fall
+out of the machine rather than being invented: **the ball** in play, **the
+flippers** you control with, **the parts** you hit, and **the machine** itself.
+So:
+
+| Layer | Acts on | Answers |
+| --- | --- | --- |
+| **Relics** | Events | *What rule is bent?* |
+| **Levels** | Part classes | *What is my best shot worth?* |
+| **Coils** | The flippers | *How long do I keep the ball alive?* |
+| **Ball mods** | One ball | *What is **this** ball?* |
+| **Table mods** | The playfield | *What does the machine look like?* |
+
+The load-bearing split is the last two columns against the first two. Relics and
+levels make a good ball **worth more**. Coils and ball mods make good balls
+**more likely**. A run that only buys score dies at ante 4 with a huge MULT it
+never got to use; a run that only buys survival keeps the ball alive for a
+minute and still misses the target. That tension is the build decision, and it
+is the thing a naive Balatro clone leaves out.
+
+**Relics stay the primary axis.** Balatro is a game about jokers with four
+supporting systems, not a game about five equal systems — spreading power evenly
+across categories is how this ends up with five shallow ones. The rule of thumb:
+if an effect could be a relic, it should be a relic.
 
 ### Relics (jokers)
 
@@ -216,6 +246,83 @@ table mod that adds a fourth bumper worth more later than it was early.
 | Spinner (per rev) | 5 | +4 |
 | Rollover lane | 25 | +15 |
 | Orbit | 100 | +60 |
+
+### Coils (flipper powerups)
+
+Upgrades to the flippers and the machinery around them. This is the **survival**
+axis, and it is the only layer that changes how the game *feels* in the hand
+rather than what a hit is worth. Deliberately kept off the score sheet: a coil
+never adds a point, it only buys you more chances to score.
+
+| Coil | Effect |
+| --- | --- |
+| Hot Winding | Flipper sweep is 20% faster — a later flip still connects |
+| Heavy Bat | The flipper imparts more speed; harder shots, less control |
+| Long Bat | +4px flipper length, narrowing the drain gap *(exists as a mod)* |
+| Magna-Hold | Hold a flipper to catch and cradle the ball for up to 2s |
+| Post Save | A centre post between the flippers, once per ball |
+| Kickback | The left outlane fires the ball back into play, once per stage |
+| Dead Bounce | A ball landing on a *lowered* flipper bounces up instead of rolling to the tip |
+| Second Coil | An upper-left flipper, for shots that are otherwise unreachable |
+
+`Magna-Hold` is the one that changes the skill ceiling rather than the floor.
+Cradling is the single biggest technique in real pinball — it converts a chaotic
+ball into an aimed shot — and it is currently impossible here because a resting
+flipper rolls the ball straight to its tip. Adding it is the difference between
+*reacting* and *playing*.
+
+`Heavy Bat` is deliberately double-edged. More speed is more scoring and less
+control, and a player who buys both it and `Hot Winding` should find the table
+genuinely harder to hold. Not every coil should be a straight upgrade.
+
+### Ball mods
+
+Applied to **one ball**, chosen before it is plunged. Everything else in the
+build is decided in the shop, minutes before it matters; this is the only layer
+that asks the player a question *during* a stage — "I have two balls left and
+I'm 4,000 short: do I spend the Heavy Ball now or save it?"
+
+That per-ball decision point is worth more than the effects themselves. Right
+now the only choices in a stage are which target to shoot at, and the game is
+thinner for it.
+
+| Ball mod | Effect |
+| --- | --- |
+| Heavy Ball | Ball is 2× the size — cannot fit down the drain gap, but also cannot enter the orbits or lanes |
+| Light Ball | Smaller and faster; reaches shots a normal ball cannot, drains more easily |
+| Gilded Ball | This ball's hits score ×2 |
+| Slow Ball | Time runs at 60% for this ball's first 10 seconds |
+| Ghost Ball | Survives its first drain |
+| Split Ball | Becomes two balls on the first bumper hit |
+
+`Heavy Ball` is the clearest example of why the playfield being *data* pays off.
+Doubling the ball's radius is one number, and the consequences are entirely
+geometric and entirely honest: an 8px drain gap will not pass a 16px ball, and
+neither will an 11px outlane or a 22px orbit. The upgrade protects you and locks
+you out of half the table in the same stroke, and nobody had to write a rule
+saying so.
+
+`Slow Ball` needs care. Slowing time is the most powerful thing you can hand a
+player in a real-time game — it makes *everything* easier, including the parts
+that are supposed to be hard. So it is strictly limited: a few seconds, once per
+ball, never permanent. If it becomes a general difficulty setting it will
+quietly replace skill, and the feel gate stops meaning anything.
+
+### What these categories are *not*
+
+Two of the obvious ideas already exist under other names, and giving them their
+own layer would be the mistake that turns five categories into five shallow
+ones:
+
+- **"Score multipliers from hitting components"** is what `Relics` and `Levels`
+  already are — `Brass Bumper` is a component multiplier, and `Bumpers Lv3` is
+  the flat version of the same thing.
+- **"Bumper multipliers"** is exactly `Target levels`. The bumper is one of
+  seven part classes that already level.
+
+If an idea can be expressed as an existing layer, it should be. New layers earn
+their place by acting on a **new object** (the flippers, one ball) or at a **new
+time** (mid-stage rather than in the shop) — not by being a new number.
 
 ## Boss blinds
 

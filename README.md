@@ -149,16 +149,21 @@ that rather than two that drift.
 ## Status
 
 The run loop is complete: one table, the full 8-ante structure, 14 relics, 4
-table mods, 8 boss blinds, target levels, and the shop. The presentation is
+table mods, 8 boss blinds, target levels, and the shop. Two further modifier
+layers — flipper coils and per-ball mods — are designed but not built. The
+presentation is
 2.5D — perspective playfield, extruded parts, and a drawn cabinet with rails, a
 lockdown bar and a backbox.
 
 It has been run: both tests pass under Godot 4.6.3, and the web export has been
 loaded in a browser through the menu, a blind intro, a plunge and a ball in
-play. That testing found and fixed six real bugs — two ball traps that made the
+play. That testing, plus one round of actually playing it, found and fixed seven
+real bugs — two ball traps that made the
 table unable to drain, friction roughly 4× too high, a plunger that ignored a
 tap, a menu that could start two runs at once, and a `Label` built in the wrong
-order that ran its text off the screen.
+order that ran its text off the screen, and an inlane that fed the drain
+instead of the flipper — which made losing the ball on either side unavoidable,
+and which only playing the game revealed.
 
 See [docs/roadmap.md](docs/roadmap.md) for what comes next. In short:
 
