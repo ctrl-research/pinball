@@ -4,14 +4,14 @@ The design doc says what the game *is*. This says what order we build it in, and
 what has to be true before each step earns the next one.
 
 One rule runs through all of it: **the feel gate comes before content.** A
-pinball roguelike whose flippers are unsatisfying cannot be rescued by relics,
-and every hour spent on relics before that is settled is an hour spent on
+pinball roguelike whose flippers are unsatisfying cannot be rescued by trinkets,
+and every hour spent on trinkets before that is settled is an hour spent on
 content we might have to rebalance against a different-feeling table.
 
 ## Where we are
 
 Milestone 1 (vertical slice) and most of milestone 2 (run loop) are merged: one
-table, the full 8-ante structure, 14 relics, 4 table mods, 8 boss blinds, target
+table, the full 8-ante structure, 14 trinkets, 4 table mods, 8 boss blinds, target
 levels, a shop, and procedural audio. CI exports the web build and runs a
 scoring unit test plus a headless bot that plays the real scene.
 
@@ -76,11 +76,13 @@ enough to prove the scoring engine and not enough to have a favourite shot.
 
 - **Fill the table** — a ramp with a habitrail return, a captive ball, a
   kickback, a second drop bank, upper flipper. Every one is a new shot, and a
-  shot is what a player actually builds a relic around.
-- **Relic pool to ~30** — enough that two runs diverge. The current 14 all
-  read as "more points"; the pool needs relics that change *routing* (rewards
+  shot is what a player actually builds a trinket around.
+- **Trinket pool to ~30** — enough that two runs diverge. The current 14 all
+  read as "more points"; the pool needs trinkets that change *routing* (rewards
   for orbits, for combos, for keeping a ball above the slingshots).
-- **Coils and ball mods** — the two new modifier layers, designed in
+- ~~**Consumables**~~ — **built**: eight of them, three slots, bought and sold
+  in the shop and spent at the stage intro.
+- **Coils** — the remaining new modifier layer, designed in
   `game-design.md`. Coils are the survival axis (they never add a point, they
   buy chances to score); ball mods are the only layer that asks the player a
   question *during* a stage rather than in the shop. Together they create the
@@ -101,7 +103,7 @@ enough to prove the scoring engine and not enough to have a favourite shot.
 
 - Unlocks, so a new player meets a smaller pool than a veteran.
 - Seeded runs (the field exists; make it shareable) and a daily.
-- A run-history screen: best score per ante, most-used relics.
+- A run-history screen: best score per ante, most-used trinkets.
 - Balance pass driven by real play data, not by intuition — the score curve is
   borrowed from Balatro and has never been checked against this scoring engine.
 
@@ -132,7 +134,7 @@ Written down so they stop coming up:
   completely different — a good ball might overshoot ante 3 entirely. This
   needs real data, and it is the most likely thing to need a rework.
 - **MULT is the only interesting axis.** Value is flat and additive; MULT is
-  where every decision lives. If Phase 2 relics do not diversify that, the
+  where every decision lives. If Phase 2 trinkets do not diversify that, the
   build variety is cosmetic.
 - **Perspective versus readability.** Foreshortening the top of the playfield
   makes the bumper cluster smaller exactly where a lot of the scoring happens.

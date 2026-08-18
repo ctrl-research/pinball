@@ -3,21 +3,25 @@ extends Node
 ##
 ## Everything that answers "how many points was that worth" lives here, and the
 ## table only ever reports *what was hit*. Keeping the arithmetic in one place
-## is what makes relics tractable: a relic is a branch at a named hook in this
+## is what makes trinkets tractable: a trinket is a branch at a named hook in this
 ## file rather than a patch threaded through a dozen playfield scripts.
 ##
 ## The table is a physics toy that emits events. This is the game.
 
 signal score_changed
 signal mult_changed
-signal relics_changed
+signal trinkets_changed
+signal consumables_changed
 signal tokens_changed
 signal stage_changed
 signal nudges_changed
-signal ball_awarded  ## a relic conjured an extra ball onto the playfield
+signal ball_awarded  ## a trinket conjured an extra ball onto the playfield
 signal toast(text: String)
 
-const MAX_RELICS := 5
+const MAX_TRINKETS := 5
+## Three is enough to hold an answer for the boss you can see coming and still
+## have to choose; five would mean never having to.
+const MAX_CONSUMABLES := 3
 const BASE_BALLS := 3
 const MAX_NUDGES := 2
 const NUDGE_RECHARGE := 5.0  # seconds per nudge
@@ -28,7 +32,8 @@ const COMBO_WINDOW := 1.5
 var ante := 1
 var blind := Catalog.SMALL
 var tokens := 0
-var relics: Array[String] = []
+var trinkets: Array[String] = []
+var consumables: Array[String] = []
 var mods: Array[String] = []
 var levels := {}  ## Catalog.Source -> int, absent means level 1
 var rng := RandomNumberGenerator.new()
@@ -46,6 +51,10 @@ var stage_mult_bonus := 0.0  ## Drop Devotion, and anything else that persists a
 ## `balls_left` is zero by the time it is scored -- but "how many balls you did
 ## not need" is still the thing the payout should reward, and this is the only
 ## place it exists.
+## Stage-scoped switches turned on by spending a consumable. Cleared every
+## stage, which is what makes them consumable rather than a second trinket slot.
+var effects := {}
+var _second_wind_used := false
 var target_met := false
 var balls_left_at_target := 0
 var _ball_saved_this_stage := false
@@ -71,7 +80,8 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if nudges < MAX_NUDGES:
 		var before := int(nudges)
-		nudges = minf(float(MAX_NUDGES), nudges + delta / NUDGE_RECHARGE)
+		var rate := NUDGE_RECHARGE / (3.0 if effects.has("steady_hand") else 1.0)
+		nudges = minf(float(MAX_NUDGES), nudges + delta / rate)
 		if int(nudges) != before:
 			nudges_changed.emit()
 
@@ -85,11 +95,13 @@ func new_run(with_seed: int = 0) -> void:
 	ante = 1
 	blind = Catalog.SMALL
 	tokens = 4
-	relics.clear()
+	trinkets.clear()
+	consumables.clear()
 	mods.clear()
 	levels.clear()
 	begin_stage()
-	relics_changed.emit()
+	trinkets_changed.emit()
+	consumables_changed.emit()
 	tokens_changed.emit()
 
 
@@ -98,6 +110,8 @@ func begin_stage() -> void:
 	target = Catalog.blind_target(ante, blind)
 	balls_left = balls_for_stage()
 	stage_mult_bonus = 0.0
+	effects.clear()
+	_second_wind_used = false
 	target_met = false
 	balls_left_at_target = 0
 	_ball_saved_this_stage = false
@@ -114,10 +128,12 @@ func begin_stage() -> void:
 func begin_ball() -> void:
 	# Deadhead is the whole reason this is a branch and not an assignment: it
 	# converts the run from three independent attempts into one accumulating
-	# one, which is the single biggest swing any relic in the pool can make.
-	if not has_relic("deadhead"):
+	# one, which is the single biggest swing any trinket in the pool can make.
+	if not has_trinket("deadhead"):
 		mult = 1.0
 	mult += stage_mult_bonus
+	if effects.has("loaded_plunger"):
+		mult = maxf(mult, 3.0)
 	nudges = float(MAX_NUDGES)
 	tilted = false
 	_hits_this_ball = 0
@@ -130,11 +146,16 @@ func begin_ball() -> void:
 	nudges_changed.emit()
 
 
-## Called when a ball leaves play. Returns true if a relic put it back.
+## Called when a ball leaves play. Returns true if a trinket put it back.
 func consume_ball(via_outlane: bool) -> bool:
-	if via_outlane and has_relic("outlane_insurance"):
+	if via_outlane and has_trinket("outlane_insurance"):
 		_grant_tokens(3, "Outlane Insurance +$3")
-	if has_relic("ball_saver") and not _ball_saved_this_stage:
+	if effects.has("second_wind") and not _second_wind_used:
+		_second_wind_used = true
+		toast.emit("SECOND WIND")
+		begin_ball()
+		return true
+	if has_trinket("ball_saver") and not _ball_saved_this_stage:
 		_ball_saved_this_stage = true
 		toast.emit("BALL SAVED")
 		begin_ball()
@@ -148,7 +169,7 @@ func consume_ball(via_outlane: bool) -> bool:
 
 func balls_for_stage() -> int:
 	var n := BASE_BALLS
-	if has_relic("cold_solder"):
+	if has_trinket("cold_solder"):
 		n -= 1
 	return maxi(1, n)
 
@@ -238,40 +259,45 @@ func register_hit(source: int, count: int = 1) -> int:
 	var level: int = int(levels.get(source, 1))
 	var value := float(Catalog.source_value(source, level) * count)
 
-	# --- per-source relic and boss hooks ---
+	# --- per-source trinket and boss hooks ---
 	match source:
 		Catalog.Source.BUMPER:
 			_bumper_hits += count
 			if boss_active("dead_bumper"):
 				value = 0.0
-			if has_relic("brass_bumper"):
+			if has_trinket("brass_bumper"):
 				value *= 3.0
-			if has_relic("magnet_coil") and _bumper_hits >= 10:
+			if has_trinket("magnet_coil") and _bumper_hits >= 10:
 				_bumper_hits -= 10
 				ball_awarded.emit()
 				toast.emit("MAGNET COIL - EXTRA BALL")
 		Catalog.Source.SLINGSHOT:
-			if has_relic("slingshot_savant"):
+			if has_trinket("slingshot_savant"):
 				value += 25.0 * count
 		Catalog.Source.SPINNER:
-			if has_relic("spinner_fever"):
+			if has_trinket("spinner_fever"):
 				# Each spin raises the value of the spins after it, so a long
 				# rip is worth far more than the sum of its revolutions.
 				value += float(_spinner_bonus) * count
 				_spinner_bonus += 5 * count
 
-	if has_relic("cold_solder"):
+	if has_trinket("cold_solder"):
+		value *= 2.0
+	if effects.has("ball_polish"):
 		value *= 2.0
 
-	# --- per-hit relic and boss hooks ---
+	# --- per-hit trinket and boss hooks ---
 	var now := float(Time.get_ticks_msec()) / 1000.0
-	if has_relic("combo_coil") and now - _last_hit_time <= COMBO_WINDOW:
+	if has_trinket("combo_coil") and now - _last_hit_time <= COMBO_WINDOW:
 		add_mult(0.2)
 	_last_hit_time = now
 
-	if _hits_this_ball == 0 and has_relic("skill_shot"):
+	if _hits_this_ball == 0 and has_trinket("skill_shot"):
 		value *= 5.0
 		toast.emit("SKILL SHOT x5")
+	if _hits_this_ball == 0 and effects.has("jackpot_charge"):
+		value *= 10.0
+		toast.emit("JACKPOT CHARGE x10")
 	_hits_this_ball += count
 
 	if boss_active("reset"):
@@ -283,7 +309,7 @@ func register_hit(source: int, count: int = 1) -> int:
 
 	var points := int(round(value * effective_mult()))
 
-	if has_relic("jackpot_lamp"):
+	if has_trinket("jackpot_lamp"):
 		_hits_since_jackpot += count
 		if _hits_since_jackpot >= 8:
 			_hits_since_jackpot -= 8
@@ -302,7 +328,7 @@ func _bank(points: int) -> void:
 		target_met = true
 		balls_left_at_target = balls_left
 		toast.emit("TARGET MET - PLAY ON FOR BONUS")
-	if has_relic("penny_slot"):
+	if has_trinket("penny_slot"):
 		_penny_progress += points
 		while _penny_progress >= 1000:
 			_penny_progress -= 1000
@@ -312,6 +338,8 @@ func _bank(points: int) -> void:
 
 
 func add_mult(amount: float) -> void:
+	if effects.has("overclock"):
+		amount *= 2.0
 	mult += amount
 	mult_changed.emit()
 
@@ -322,7 +350,7 @@ func add_mult(amount: float) -> void:
 ## number the player has been building.
 func effective_mult() -> float:
 	var m := mult
-	if has_relic("tilt_gremlin") and int(nudges) <= 0:
+	if has_trinket("tilt_gremlin") and int(nudges) <= 0:
 		m += 2.0
 	if boss_active("governor"):
 		m = minf(m, 4.0)
@@ -331,7 +359,7 @@ func effective_mult() -> float:
 
 ## Drop banks are the only element that scores as a set rather than per-hit.
 func drop_bank_cleared() -> void:
-	if has_relic("drop_devotion"):
+	if has_trinket("drop_devotion"):
 		stage_mult_bonus += 1.0
 		add_mult(1.0)
 		toast.emit("DROP DEVOTION +1 MULT")
@@ -360,15 +388,81 @@ func try_nudge() -> int:
 # --- Inventory ----------------------------------------------------------------
 
 
-func has_relic(id: String) -> bool:
-	return relics.has(id)
+## How big the ball is this stage. Heavy Ball is the clearest thing the
+## playfield-as-data buys us: doubling one number means the ball no longer fits
+## through the 18px drain gap, and no longer fits down an 11px outlane or a
+## 22px orbit either. It protects and locks out in the same stroke, and nobody
+## had to write a rule saying so.
+func ball_radius_scale() -> float:
+	return 2.0 if effects.has("heavy_ball") else 1.0
 
 
-func add_relic(id: String) -> bool:
-	if relics.size() >= MAX_RELICS or has_relic(id):
+func has_trinket(id: String) -> bool:
+	return trinkets.has(id)
+
+
+func add_trinket(id: String) -> bool:
+	if trinkets.size() >= MAX_TRINKETS or has_trinket(id):
 		return false
-	relics.append(id)
-	relics_changed.emit()
+	trinkets.append(id)
+	trinkets_changed.emit()
+	return true
+
+
+## Duplicates are allowed, unlike trinkets: holding two Ball Polish is a
+## legitimate thing to want, and holding two of the same trinket is not.
+func add_consumable(id: String) -> bool:
+	if consumables.size() >= MAX_CONSUMABLES:
+		return false
+	consumables.append(id)
+	consumables_changed.emit()
+	return true
+
+
+## Spend a consumable. Everything except Extra Ball simply switches on a
+## stage-scoped effect; Extra Ball is immediate because a ball count is not an
+## effect, it is a resource.
+func use_consumable(index: int) -> bool:
+	if index < 0 or index >= consumables.size():
+		return false
+	var id: String = consumables[index]
+	consumables.remove_at(index)
+	if id == "extra_ball":
+		balls_left += 1
+		stage_changed.emit()
+	else:
+		effects[id] = true
+	consumables_changed.emit()
+	toast.emit(str(Catalog.CONSUMABLES[id]["name"]).to_upper())
+	return true
+
+
+## Sell an owned item back. Returns what it fetched, or 0 if there was nothing
+## at that index.
+func sell(kind: String, index: int) -> int:
+	var list: Array = trinkets if kind == "trinket" else consumables
+	if index < 0 or index >= list.size():
+		return 0
+	var id: String = list[index]
+	var price := Catalog.sell_price(kind, id)
+	list.remove_at(index)
+	tokens += price
+	tokens_changed.emit()
+	if kind == "trinket":
+		trinkets_changed.emit()
+	else:
+		consumables_changed.emit()
+	return price
+
+
+## Whether there is room for what an offer would give you. Checked by the shop
+## so a full inventory greys the button out rather than taking the money.
+func can_take(offer: Dictionary) -> bool:
+	match str(offer["kind"]):
+		"trinket":
+			return trinkets.size() < MAX_TRINKETS and not has_trinket(str(offer["id"]))
+		"consumable":
+			return consumables.size() < MAX_CONSUMABLES
 	return true
 
 
@@ -408,38 +502,39 @@ func spend(amount: int) -> bool:
 # --- Shop ---------------------------------------------------------------------
 
 
-## Three offers: weighted toward relics, because relics are the axis players
-## build around and a shop that mostly sells flat numbers is a shop nobody
-## remembers.
-func roll_shop(count: int = 3) -> Array:
+## Four offers, weighted toward trinkets and consumables.
+##
+## Trinkets lead because they are the axis players build around; consumables are
+## second because they are the only thing that answers a boss you can already
+## see. Table mods and levels are the long tail -- they matter, but a shop that
+## mostly sells flat numbers is a shop nobody remembers.
+func roll_shop(count: int = 4) -> Array:
 	var offers: Array = []
-	var relic_pool: Array = []
-	for id in Catalog.RELICS:
-		if not has_relic(id) and relics.size() < MAX_RELICS:
-			relic_pool.append(id)
+	var trinket_pool: Array = []
+	for id in Catalog.TRINKETS:
+		if not has_trinket(id):
+			trinket_pool.append(id)
 	var mod_pool: Array = []
 	for id in Catalog.MODS:
 		if not has_mod(id):
 			mod_pool.append(id)
+	var consumable_pool: Array = Catalog.CONSUMABLES.keys()
 
 	for i in count:
 		var roll := rng.randf()
-		if roll < 0.6 and not relic_pool.is_empty():
-			var id: String = relic_pool[rng.randi() % relic_pool.size()]
-			relic_pool.erase(id)
-			offers.append({
-				"kind": "relic", "id": id,
-				"name": Catalog.RELICS[id]["name"], "desc": Catalog.RELICS[id]["desc"],
-				"cost": Catalog.RELICS[id]["cost"],
-			})
-		elif roll < 0.8 and not mod_pool.is_empty():
+		if roll < 0.45 and not trinket_pool.is_empty():
+			var id: String = trinket_pool[rng.randi() % trinket_pool.size()]
+			trinket_pool.erase(id)
+			offers.append(_offer("trinket", id, Catalog.TRINKETS[id]))
+		elif roll < 0.72 and not consumable_pool.is_empty():
+			# Not erased from the pool: two of the same consumable on one shelf
+			# is fine, because holding two of them is fine.
+			var id: String = consumable_pool[rng.randi() % consumable_pool.size()]
+			offers.append(_offer("consumable", id, Catalog.CONSUMABLES[id]))
+		elif roll < 0.82 and not mod_pool.is_empty():
 			var id: String = mod_pool[rng.randi() % mod_pool.size()]
 			mod_pool.erase(id)
-			offers.append({
-				"kind": "mod", "id": id,
-				"name": Catalog.MODS[id]["name"], "desc": Catalog.MODS[id]["desc"],
-				"cost": Catalog.MODS[id]["cost"],
-			})
+			offers.append(_offer("mod", id, Catalog.MODS[id]))
 		else:
 			var sources := Catalog.SOURCE_STATS.keys()
 			sources.erase(Catalog.Source.JACKPOT)
@@ -454,12 +549,25 @@ func roll_shop(count: int = 3) -> Array:
 	return offers
 
 
+func _offer(kind: String, id: String, def: Dictionary) -> Dictionary:
+	return {
+		"kind": kind, "id": id,
+		"name": str(def["name"]), "desc": str(def["desc"]), "cost": int(def["cost"]),
+	}
+
+
 func buy(offer: Dictionary) -> bool:
+	# Capacity is checked before the money moves, so a full inventory cannot
+	# take payment for something it has nowhere to put.
+	if not can_take(offer):
+		return false
 	if not spend(int(offer["cost"])):
 		return false
 	match str(offer["kind"]):
-		"relic":
-			add_relic(str(offer["id"]))
+		"trinket":
+			add_trinket(str(offer["id"]))
+		"consumable":
+			add_consumable(str(offer["id"]))
 		"mod":
 			add_mod(str(offer["id"]))
 		"level":

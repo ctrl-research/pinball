@@ -1,7 +1,7 @@
 extends Node
 ## Unit test for the scoring engine (`src/autoload/run.gd`).
 ##
-## Deliberately not a physics test: every relic, boss and level interaction is
+## Deliberately not a physics test: every trinket, boss and level interaction is
 ## pure arithmetic on `Run`, so it can be checked exactly and instantly. The
 ## headless sim covers whether a ball can actually reach the things being
 ## scored -- these two together are the whole surface.
@@ -15,7 +15,7 @@ var _failures := 0
 func _ready() -> void:
 	_targets()
 	_base_scoring()
-	_relics()
+	_trinkets()
 	_levels()
 	_bosses()
 	_tilt()
@@ -23,6 +23,8 @@ func _ready() -> void:
 	_economy()
 	_progression()
 	_stage_completion()
+	_inventory()
+	_consumables()
 
 	if _failures > 0:
 		push_error("RUN_TEST_FAILED: %d check(s)" % _failures)
@@ -68,28 +70,28 @@ func _base_scoring() -> void:
 	_eq(Run.register_hit(Catalog.Source.SPINNER, 10), 50, "10 spinner revolutions")
 
 
-func _relics() -> void:
+func _trinkets() -> void:
 	Run.new_run(1003)
-	Run.add_relic("brass_bumper")
+	Run.add_trinket("brass_bumper")
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 30, "Brass Bumper triples bumpers")
 	_eq(Run.register_hit(Catalog.Source.SLINGSHOT), 15, "and leaves slingshots alone")
 
 	Run.new_run(1004)
-	Run.add_relic("slingshot_savant")
+	Run.add_trinket("slingshot_savant")
 	_eq(Run.register_hit(Catalog.Source.SLINGSHOT), 40, "Slingshot Savant adds +25")
 
 	Run.new_run(1005)
-	Run.add_relic("skill_shot")
+	Run.add_trinket("skill_shot")
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 50, "Skill Shot x5 on the first hit")
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "and only the first hit")
 
 	Run.new_run(1006)
-	Run.add_relic("cold_solder")
+	Run.add_trinket("cold_solder")
 	_eq(Run.balls_for_stage(), 2, "Cold Solder costs a ball")
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 20, "Cold Solder doubles values")
 
 	Run.new_run(1007)
-	Run.add_relic("tilt_gremlin")
+	Run.add_trinket("tilt_gremlin")
 	Run.nudges = 0.0
 	_eq(Run.effective_mult(), 3.0, "Tilt Gremlin adds +2 MULT with no nudges left")
 	Run.nudges = 2.0
@@ -98,9 +100,9 @@ func _relics() -> void:
 	# Five slots, and no duplicates.
 	Run.new_run(1008)
 	for id in ["brass_bumper", "skill_shot", "ball_saver", "penny_slot", "combo_coil"]:
-		_check(Run.add_relic(id), "relic %s fits" % id)
-	_check(not Run.add_relic("deadhead"), "the sixth relic is refused")
-	_check(not Run.add_relic("brass_bumper"), "duplicates are refused")
+		_check(Run.add_trinket(id), "trinket %s fits" % id)
+	_check(not Run.add_trinket("deadhead"), "the sixth trinket is refused")
+	_check(not Run.add_trinket("brass_bumper"), "duplicates are refused")
 
 
 func _levels() -> void:
@@ -153,7 +155,7 @@ func _deadhead() -> void:
 	_eq(Run.mult, 1.0, "MULT resets between balls by default")
 
 	Run.new_run(1016)
-	Run.add_relic("deadhead")
+	Run.add_trinket("deadhead")
 	Run.add_mult(4.0)
 	Run.begin_ball()
 	_eq(Run.mult, 5.0, "Deadhead carries MULT between balls")
@@ -173,7 +175,7 @@ func _economy() -> void:
 	_check(not Run.buy(offers[1]), "a broke player cannot buy")
 
 	Run.new_run(1018)
-	Run.add_relic("penny_slot")
+	Run.add_trinket("penny_slot")
 	Run.tokens = 0
 	Run.register_hit(Catalog.Source.ORBIT, 10)  # 100 * 10 = 1000
 	_eq(Run.tokens, 1, "Penny Slot pays $1 per 1,000 points")
@@ -260,3 +262,91 @@ func _stage_completion() -> void:
 	_eq(Run.balls_left, 0, "three drains use three balls")
 	_check(not Run.stage_won(), "with no score the target is missed")
 	_check(Run.run_lost(), "which is a loss")
+
+
+## Inventory limits and selling.
+func _inventory() -> void:
+	Run.new_run(1030)
+	for id in ["brass_bumper", "skill_shot", "ball_saver", "penny_slot", "combo_coil"]:
+		_check(Run.add_trinket(id), "trinket %s fits" % id)
+	_check(not Run.add_trinket("deadhead"), "the sixth trinket is refused")
+
+	_eq(Run.add_consumable("ball_polish"), true, "a consumable fits")
+	_eq(Run.add_consumable("ball_polish"), true, "and duplicates are allowed")
+	_eq(Run.add_consumable("overclock"), true, "three consumables fit")
+	_check(not Run.add_consumable("heavy_ball"), "the fourth consumable is refused")
+
+	# Selling returns 75% of shelf price, rounded down.
+	_eq(Catalog.sell_price("trinket", "brass_bumper"), 3, "a $4 trinket sells for $3")
+	_eq(Catalog.sell_price("consumable", "steady_hand"), 2, "a $3 consumable sells for $2")
+	_eq(Catalog.sell_price("trinket", "deadhead"), 7, "a $10 trinket sells for $7")
+
+	Run.tokens = 0
+	var before := Run.trinkets.size()
+	_eq(Run.sell("trinket", 0), 3, "selling pays out")
+	_eq(Run.trinkets.size(), before - 1, "and removes the item")
+	_eq(Run.tokens, 3, "and the money arrives")
+	_eq(Run.sell("trinket", 99), 0, "selling nothing pays nothing")
+
+	# A full inventory refuses the offer before it takes the money.
+	Run.new_run(1031)
+	Run.tokens = 50
+	for id in ["brass_bumper", "skill_shot", "ball_saver", "penny_slot", "combo_coil"]:
+		Run.add_trinket(id)
+	var offer := {"kind": "trinket", "id": "deadhead", "cost": 10}
+	_check(not Run.can_take(offer), "a full trinket rack cannot take another")
+	_check(not Run.buy(offer), "so the purchase is refused")
+	_eq(Run.tokens, 50, "and no money changes hands")
+
+	# Nor can you buy a duplicate trinket.
+	_check(not Run.can_take({"kind": "trinket", "id": "brass_bumper", "cost": 4}),
+		"duplicated trinkets are refused")
+
+
+## Consumables are stage-scoped, and spending one removes it.
+func _consumables() -> void:
+	Run.new_run(1032)
+	Run.add_consumable("ball_polish")
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "unspent, it does nothing")
+	_check(Run.use_consumable(0), "it can be spent")
+	_eq(Run.consumables.size(), 0, "and is gone afterwards")
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 20, "Ball Polish doubles values")
+
+	# ...and only for this stage.
+	Run.blind = Catalog.BIG
+	Run.begin_stage()
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "the effect does not survive the stage")
+
+	Run.new_run(1033)
+	Run.add_consumable("extra_ball")
+	var balls := Run.balls_left
+	Run.use_consumable(0)
+	_eq(Run.balls_left, balls + 1, "Extra Ball is a resource, granted immediately")
+
+	Run.new_run(1034)
+	Run.add_consumable("loaded_plunger")
+	Run.use_consumable(0)
+	Run.begin_ball()
+	_eq(Run.mult, 3.0, "Loaded Plunger starts each ball at x3")
+
+	Run.new_run(1035)
+	_eq(Run.ball_radius_scale(), 1.0, "the ball is normally normal-sized")
+	Run.add_consumable("heavy_ball")
+	Run.use_consumable(0)
+	_eq(Run.ball_radius_scale(), 2.0, "Heavy Ball doubles it")
+
+	Run.new_run(1036)
+	Run.add_consumable("overclock")
+	Run.use_consumable(0)
+	Run.add_mult(1.0)
+	_eq(Run.mult, 3.0, "Overclock doubles MULT gains")
+
+	Run.new_run(1037)
+	Run.add_consumable("second_wind")
+	Run.use_consumable(0)
+	var had := Run.balls_left
+	_check(Run.consume_ball(false), "Second Wind returns the first drained ball")
+	_eq(Run.balls_left, had, "at no cost")
+	_check(not Run.consume_ball(false), "but only once")
+
+	_check(not Run.use_consumable(0), "spending nothing fails cleanly")

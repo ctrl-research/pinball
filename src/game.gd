@@ -32,6 +32,8 @@ func _ready() -> void:
 	add_child(hud)
 	hud.confirmed.connect(_on_confirmed)
 	hud.bought.connect(_on_bought)
+	hud.sold.connect(_on_sold)
+	hud.used.connect(_on_used)
 
 	Run.toast.connect(hud.toast)
 	_enter_intro()
@@ -92,7 +94,7 @@ func _on_drained(via_outlane: bool) -> void:
 		return
 	table.active = false
 	if Run.consume_ball(via_outlane):
-		_start_stage()  # a relic put the ball back
+		_start_stage()  # a trinket put the ball back
 		return
 	# A stage always plays out its full complement of balls. Crossing the target
 	# does not end it -- it only means the rest of the stage is played for the
@@ -131,3 +133,25 @@ func _on_bought(index: int) -> void:
 		Sfx.play("buy")
 		shop_offers.remove_at(index)
 		hud.show_shop(shop_offers)
+
+
+func _on_sold(kind: String, index: int) -> void:
+	if state != State.SHOP:
+		return
+	if Run.sell(kind, index) > 0:
+		Sfx.play("buy")
+		# Rebuilt rather than patched: selling can re-enable a "FULL" offer, so
+		# the buy column is stale too.
+		hud.show_shop(shop_offers)
+
+
+func _on_used(index: int) -> void:
+	if state != State.INTRO:
+		return
+	if Run.use_consumable(index):
+		Sfx.play("buy")
+		# The table is rebuilt so a consumable that changes the machine (a
+		# heavier ball) is in effect before the first plunge, not after it.
+		table.build()
+		table.set_fog(Run.boss_active("fog"))
+		hud.show_intro()

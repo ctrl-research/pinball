@@ -3,7 +3,7 @@
 ## Purpose
 
 **TILT** — an arcade pixel-art pinball roguelike in Godot 4.6.3. Balatro's run
-structure (antes, score-gated blinds, relics, a shop) on a real pinball
+structure (antes, score-gated blinds, trinkets, a shop) on a real pinball
 playfield. Exports to web and deploys to GitHub Pages.
 
 Design lives in [docs/game-design.md](docs/game-design.md), build order in
@@ -28,7 +28,7 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
 ├── src/
 │   ├── autoload/run.gd      # run state + ALL scoring arithmetic ("Run")
 │   ├── autoload/sfx.gd      # procedural audio ("Sfx")
-│   ├── run/catalog.gd       # relics, mods, bosses, blind curve -- data only
+│   ├── run/catalog.gd       # trinkets, mods, bosses, blind curve -- data only
 │   ├── table/layout.gd      # the machine, as numbers
 │   ├── table/*.gd           # table build + individual playfield parts
 │   ├── ui/cabinet.gd        # rails, lockdown, backbox + screen layout
@@ -57,9 +57,18 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
   `tools/preview_table.py` renders what the game will build (see README). Both
   ball traps found so far were visible in that picture first.
 - **The table decides nothing.** Playfield parts report what was hit by calling
-  `Run.register_hit(source)`; every number lives in `run.gd`. A new relic is a
+  `Run.register_hit(source)`; every number lives in `run.gd`. A new trinket is a
   data entry in `catalog.gd` plus a branch at a named hook in `run.gd` — if a
-  relic needs a change in `table.gd`, it is a *table mod*, not a relic.
+  trinket needs a change in `table.gd`, it is a *table mod*, not a trinket.
+- **Inventory vocabulary**: **trinkets** are passive and permanent (5 slots, no
+  duplicates); **consumables** are one-shot, stage-scoped and spent at the
+  stage intro (3 slots, duplicates fine). A consumable's effect is a key in
+  `Run.effects`, which `begin_stage()` clears — that clearing is the only thing
+  making it a consumable rather than a second trinket rack.
+- **Building a Button in code: it grows to fit its text and will not wrap.** Set
+  `clip_text` and a `custom_minimum_size`, and put any long description in a
+  wrapped Label beneath it — otherwise one long item name widens its column and
+  pushes the layout off the side of the screen.
 - **Scene files stay trivial** — a root node and a script. UI is built in code.
 - **Perspective is a rendering step, never a simulation one.** The playfield
   renders flat into `Cabinet`'s SubViewport and is warped by a shader on the way

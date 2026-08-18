@@ -63,12 +63,18 @@ const GATE_HOLD := 0.6
 
 ## Impulse speeds for a zero-charge and a full-charge plunge, in px/s.
 ##
-## Anchored to the geometry rather than picked: lifting the ball from y=320 to
-## the arch at y~48 against 480px/s^2 needs v = sqrt(2*480*272) ~= 511px/s. So
-## MIN deliberately falls short (a weak plunge dies in the orbit and is a real
-## outcome you can misplay) and MAX comfortably clears it.
-const PLUNGE_MIN_SPEED := 400.0
-const PLUNGE_MAX_SPEED := 640.0
+## The floor is not a taste decision, it is an escape velocity. Lifting the ball
+## from its rest at y=320 clear of the lane divider at y=96 needs
+## sqrt(2 * 480 * 224) ~= 464px/s, and reaching the arch needs ~511. An earlier
+## version set the minimum to 400 and described it as "a weak plunge that dies
+## in the orbit, a real outcome you can misplay" -- but 400 cannot leave the
+## lane at all. The ball rose a little, fell back, and sat there until the
+## player plunged again, which reads as a broken game rather than a bad shot.
+##
+## So the minimum clears the arch with margin, and the charge controls *where*
+## the ball ends up rather than *whether* it gets there.
+const PLUNGE_MIN_SPEED := 540.0
+const PLUNGE_MAX_SPEED := 760.0
 
 # --- Flippers -----------------------------------------------------------------
 

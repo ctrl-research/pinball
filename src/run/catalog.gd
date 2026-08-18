@@ -47,13 +47,13 @@ const BOSSES := [
 	{"id": "fog", "name": "The Fog", "desc": "The upper playfield is not drawn"},
 ]
 
-# --- Relics -------------------------------------------------------------------
+# --- Trinkets -------------------------------------------------------------------
 
 const COMMON := 0
 const UNCOMMON := 1
 const RARE := 2
 
-const RELICS := {
+const TRINKETS := {
 	"brass_bumper": {
 		"name": "Brass Bumper", "desc": "Pop bumpers score x3 value",
 		"cost": 4, "rarity": COMMON,
@@ -115,6 +115,47 @@ const RELICS := {
 	},
 }
 
+# --- Consumables --------------------------------------------------------------
+
+## One-shot items, held up to three at a time and spent on the stage intro
+## screen. Their effects last exactly one stage.
+##
+## Trinkets are the build and change slowly; consumables are the answer to "I
+## need *this* stage to go differently". That makes them the only part of the
+## economy a player spends reactively -- you buy a trinket because of what your
+## run is becoming, and a consumable because of the boss you have just been dealt.
+##
+## Stage-scoped rather than per-ball on purpose. A per-ball choice would need a
+## prompt between every ball, which is three interruptions a stage; one decision
+## at the intro, made while looking at the boss you have drawn, is the same
+## choice with none of the friction.
+const CONSUMABLES = {
+	"ball_polish": {
+		"name": "Ball Polish", "desc": "This stage: all values x2", "cost": 5,
+	},
+	"loaded_plunger": {
+		"name": "Loaded Plunger", "desc": "This stage: every ball starts at MULT x3", "cost": 6,
+	},
+	"extra_ball": {
+		"name": "Extra Ball", "desc": "One more ball this stage", "cost": 6,
+	},
+	"steady_hand": {
+		"name": "Steady Hand", "desc": "This stage: nudges recharge 3x faster", "cost": 3,
+	},
+	"heavy_ball": {
+		"name": "Heavy Ball", "desc": "This stage: the ball is twice the size", "cost": 7,
+	},
+	"second_wind": {
+		"name": "Second Wind", "desc": "This stage: the first drain returns the ball", "cost": 5,
+	},
+	"overclock": {
+		"name": "Overclock", "desc": "This stage: MULT gains are doubled", "cost": 6,
+	},
+	"jackpot_charge": {
+		"name": "Jackpot Charge", "desc": "This stage: the first hit of each ball scores x10", "cost": 5,
+	},
+}
+
 # --- Table mods ---------------------------------------------------------------
 
 ## Permanent changes to the physical playfield -- the roguelike lever pinball
@@ -143,3 +184,16 @@ static func blind_target(ante: int, blind: int) -> int:
 static func source_value(source: int, level: int) -> int:
 	var stats: Dictionary = SOURCE_STATS[source]
 	return int(stats["base"]) + int(stats["per_level"]) * maxi(0, level - 1)
+
+
+## What an owned item fetches when sold: three quarters of its shelf price,
+## rounded down. Deliberately lossy -- a lossless sell would make the shop a
+## place to park money rather than a place to make a decision.
+const SELL_FRACTION := 0.75
+
+
+static func sell_price(kind: String, id: String) -> int:
+	var table: Dictionary = TRINKETS if kind == "trinket" else CONSUMABLES
+	if not table.has(id):
+		return 0
+	return int(floor(float(table[id]["cost"]) * SELL_FRACTION))
