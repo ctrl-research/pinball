@@ -35,8 +35,12 @@ Eight antes, three stages each: small blind, big blind, boss blind.
   climbs during that ball, and is lost when the ball drains — so the ball that
   has been alive longest is worth the most and is the one you can least afford
   to lose.
-- Clear the stage and you are paid in tokens: the blind's reward, `$1` per
-  **unused** ball, and interest on what you are holding.
+- **A stage always plays all of its balls.** Beating the target does not end it
+  — it means the rest is played for money instead of for survival, and win or
+  lose is decided once, when the last ball drains.
+- Clear the stage and you are paid in tokens: the blind's reward multiplied by
+  how many times over you beat the target (capped ×5), `$1` per ball you never
+  needed, and interest on what you are holding.
 - Spend it on **relics** (up to 5, always-on, the axis you build around),
   **table mods** (which physically change the playfield), or **target levels**
   (which raise the base value of a whole class of target).

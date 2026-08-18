@@ -22,6 +22,7 @@ func _ready() -> void:
 	_deadhead()
 	_economy()
 	_progression()
+	_stage_completion()
 
 	if _failures > 0:
 		push_error("RUN_TEST_FAILED: %d check(s)" % _failures)
@@ -199,4 +200,63 @@ func _progression() -> void:
 	Run.score = Run.target
 	_check(Run.stage_won(), "hitting the target clears the stage")
 	var payout := Run.stage_payout()
-	_check(payout.size() >= 2, "clearing pays the blind and the unused balls")
+	_check(payout.size() >= 1, "clearing always pays the blind reward")
+
+
+## A stage no longer ends the moment the target falls; it runs all of its balls
+## and is judged once, at the end.
+func _stage_completion() -> void:
+	Run.new_run(1022)
+	_check(not Run.target_met, "the target starts unmet")
+	_eq(Run.balls_left, 3, "three balls in hand")
+
+	# Cross the target on the first ball.
+	Run.register_hit(Catalog.Source.ORBIT, 3)  # 100 * 3 = 300
+	_check(Run.stage_won(), "300 clears the ante 1 small blind")
+	_check(Run.target_met, "and the crossing is recorded")
+	_eq(Run.balls_left_at_target, 3, "with the balls that were still in hand")
+	_eq(Run.balls_left, 3, "crossing the target consumes nothing")
+
+	# Draining still costs balls, and the stage stays winnable-but-unfinished.
+	Run.consume_ball(false)
+	_eq(Run.balls_left, 2, "a drain after the target still costs a ball")
+	_check(Run.stage_won(), "and the stage is still won")
+	_eq(Run.balls_left_at_target, 3, "the recorded figure does not drift")
+
+	# Two balls were never needed, so two are paid for.
+	var labels: Array = []
+	for item in Run.stage_payout():
+		labels.append(str(item["label"]))
+	_check(labels.has("2 ball(s) not needed"), "pays for the balls not needed -- got %s" % [labels])
+
+	# Overkill multiplies the blind's reward rather than adding to it.
+	Run.new_run(1023)
+	Run.score = Run.target
+	_eq(Run.payout_multiplier(), 1, "exactly meeting the target is x1")
+	Run.score = Run.target * 2
+	_eq(Run.payout_multiplier(), 2, "doubling the target is x2")
+	Run.score = Run.target * 99
+	_eq(Run.payout_multiplier(), Run.PAYOUT_MULT_CAP, "and it is capped")
+
+	Run.new_run(1025)
+	Run.blind = Catalog.SMALL
+	Run.begin_stage()
+	var base: int = Catalog.BLIND_REWARD[Catalog.SMALL]
+	Run.score = Run.target * 3
+	var total := 0
+	var saw_overkill := false
+	for item in Run.stage_payout():
+		total += int(item["amount"])
+		if str(item["label"]).begins_with("Overkill"):
+			saw_overkill = true
+	_check(saw_overkill, "tripling the target shows an overkill line")
+	_check(total >= base * 3, "and the blind reward is tripled -- got %d for base %d"
+		% [total, base])
+
+	# Losing: balls gone, target missed.
+	Run.new_run(1024)
+	for i in 3:
+		Run.consume_ball(false)
+	_eq(Run.balls_left, 0, "three drains use three balls")
+	_check(not Run.stage_won(), "with no score the target is missed")
+	_check(Run.run_lost(), "which is a loss")

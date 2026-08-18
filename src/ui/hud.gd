@@ -37,6 +37,7 @@ var _mult: Label
 var _balls: Label
 var _nudge: Label
 var _tokens: Label
+var _status: Label
 var _toast_label: Label
 var _progress: ColorRect
 var _slots: Array[Control] = []
@@ -190,9 +191,10 @@ func _build_right() -> void:
 	_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	track.add_child(_progress)
 
-	_balls = _label("", Vector2(x, p.position.y + 104.0), w, 10, INK)
-	_nudge = _label("", Vector2(x, p.position.y + 122.0), w, 10, INK)
-	_tokens = _label("", Vector2(x, p.position.y + 142.0), w, 14, GOLD)
+	_status = _label("", Vector2(x, p.position.y + 94.0), w, 9, GOLD)
+	_balls = _label("", Vector2(x, p.position.y + 108.0), w, 10, INK)
+	_nudge = _label("", Vector2(x, p.position.y + 126.0), w, 10, INK)
+	_tokens = _label("", Vector2(x, p.position.y + 146.0), w, 14, GOLD)
 
 	_label("A / D  flippers\nSPACE  hold to plunge\nQ / W / E  nudge\n\n"
 		+ "Nudge on empty and it tilts.",
@@ -268,6 +270,14 @@ func _refresh() -> void:
 	var frac := 0.0 if Run.target <= 0 else clampf(float(Run.score) / float(Run.target), 0.0, 1.0)
 	_progress.size.x = (Cabinet.PANEL_RIGHT.size.x - 8.0) * frac
 
+	# Once the target is met the stage is safe but not over, and the player has
+	# no way to know that from a score readout alone.
+	if Run.target_met:
+		var mult := Run.payout_multiplier()
+		_status.text = "TARGET MET" if mult <= 1 else "TARGET MET   PAYOUT x%d" % mult
+	else:
+		_status.text = ""
+
 	_mult.text = "x%s" % _trim(Run.effective_mult())
 	_balls.text = "BALLS  %s" % _pips(Run.balls_left, Run.balls_for_stage())
 	_tokens.text = "$%d" % Run.tokens
@@ -299,13 +309,14 @@ func show_play() -> void:
 
 func show_intro() -> void:
 	_refresh()
+	_status.text = ""
 	var boss_line := ""
 	if Run.boss_id != "":
 		var boss := _boss_def(Run.boss_id)
 		boss_line = "%s  -  %s" % [str(boss["name"]), str(boss["desc"])]
 	_open(Catalog.BLIND_NAME[Run.blind].to_upper(), [
 		"Score %s to clear it." % _commas(Run.target),
-		"%d balls." % Run.balls_for_stage(),
+		"%d balls -- all of them, target met or not." % Run.balls_for_stage(),
 		boss_line,
 		"",
 		"SPACE to start",
@@ -313,12 +324,12 @@ func show_intro() -> void:
 
 
 func show_cleared(payout: Array) -> void:
-	var lines: Array = ["Scored %s of %s" % [_commas(Run.score), _commas(Run.target)], ""]
+	var lines: Array = ["Scored %s against %s" % [_commas(Run.score), _commas(Run.target)], ""]
 	for item in payout:
 		lines.append("%s   +$%d" % [str(item["label"]), int(item["amount"])])
 	lines.append("")
 	lines.append("SPACE for the shop")
-	_open("BLIND CLEARED", lines)
+	_open("VICTORY", lines)
 
 
 func show_shop(offers: Array) -> void:
@@ -341,9 +352,10 @@ func show_shop(offers: Array) -> void:
 
 
 func show_lost() -> void:
-	_open("GAME OVER", [
+	_open("DEFEAT", [
 		"Ante %d, %s" % [Run.ante, Catalog.BLIND_NAME[Run.blind]],
-		"Scored %s of %s" % [_commas(Run.score), _commas(Run.target)],
+		"Scored %s, needed %s" % [_commas(Run.score), _commas(Run.target)],
+		"Short by %s." % _commas(Run.target - Run.score),
 		"",
 		"SPACE for the menu",
 	])
