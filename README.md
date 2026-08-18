@@ -20,7 +20,10 @@ See [docs/game-design.md](docs/game-design.md) for the full design and
 | **SPACE** (hold, release) | plunger — how long you hold sets the power |
 | **Q / W / E** | nudge left / up / right |
 | **1 / 2 / 3** | fire the consumable in that slot |
-| **SPACE** | confirm, on any between-stage screen |
+| **F1** | toggle the CRT effect |
+
+Between-stage screens are advanced with an on-screen button; **Enter** works as
+a keyboard shortcut for it.
 
 Nudging buys you back a bad bounce. The meter holds two and recharges one every
 five seconds; nudge with it empty and the machine **tilts** — flippers die, the
