@@ -397,7 +397,7 @@ never adds a point, it only buys you more chances to score.
 | --- | --- |
 | Hot Winding | Flipper sweep is 20% faster — a later flip still connects |
 | Heavy Bat | The flipper imparts more speed; harder shots, less control |
-| Long Bat | +4px flipper length, narrowing the drain gap *(exists as a mod)* |
+| Long Bat | +4px flipper length *(cut — this is the `Wide Flippers` table mod)* |
 | Magna-Hold | Hold a flipper to catch and cradle the ball for up to 2s |
 | Post Save | A centre post between the flippers, once per ball |
 | Kickback | The left outlane fires the ball back into play, once per stage |
@@ -713,6 +713,15 @@ inserts, a segmented-LED score readout on the panel.
   ASCII grids and a palette in a stdlib-only Python script, so placeholder art
   stays editable in a diff rather than in a paint program. Walls stay drawn —
   they are generated geometry and a mod can move them.
+
+## Plans
+
+Work that is designed but not built keeps its plan next to the design:
+
+- [Coils](plans/coils.md) — the flipper/survival layer, the one modifier
+  category with nothing implemented behind it.
+- [Shipping on Steam](plans/steam.md) — what a desktop release needs, most of
+  which is not Steam-specific.
 
 ## Milestones
 
