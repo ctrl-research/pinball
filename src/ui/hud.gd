@@ -25,6 +25,10 @@ const SLOT_GAP := 3.0
 const INK := Color(0.86, 0.88, 0.96)
 const DIM := Color(0.46, 0.48, 0.62)
 const GOLD := Color(1.0, 0.82, 0.32)
+## Ball-queue pips: radius, and the spacing between their centres.
+const PIP_RADIUS := 4.0
+const PIP_PITCH := 12.0
+
 const FEVER_COLOUR := Color(1.0, 0.45, 0.55)
 const RED := Color(0.94, 0.36, 0.40)
 const PANEL_BG := Color(0.055, 0.052, 0.082)
@@ -45,6 +49,8 @@ var _nudge: Label
 var _tokens: Label
 var _status: Label
 var _fever: Label
+var _queue: Label
+var _queue_pips: Control
 var _fever_bar: ColorRect
 var _toast_label: Label
 var _progress: ColorRect
@@ -62,8 +68,8 @@ func _ready() -> void:
 	layer = 1
 	_build()
 	for s in [Run.score_changed, Run.mult_changed, Run.trinkets_changed,
-			Run.consumables_changed, Run.tokens_changed, Run.stage_changed,
-			Run.nudges_changed]:
+			Run.consumables_changed, Run.balls_changed, Run.tokens_changed,
+			Run.stage_changed, Run.nudges_changed]:
 		s.connect(_refresh)
 	_refresh()
 
@@ -244,17 +250,29 @@ func _build_right() -> void:
 
 	_status = _label("", Vector2(x, p.position.y + 94.0), w, 9, GOLD)
 	_balls = _label("", Vector2(x, p.position.y + 108.0), w, 10, INK)
-	_nudge = _label("", Vector2(x, p.position.y + 126.0), w, 10, INK)
-	_tokens = _label("", Vector2(x, p.position.y + 146.0), w, 14, GOLD)
+	# Shown up front, because the balls are drawn from the slot ratio at the
+	# start of the stage. A roll you can see is a roll you can plan around; the
+	# same roll revealed one ball at a time reads as the machine cheating.
+	# Colour first, names second. The pip colours are the ball colours on the
+	# playfield, so the head of the queue is the thing the player is looking at.
+	_queue_pips = Control.new()
+	_queue_pips.position = Vector2(x, p.position.y + 122.0)
+	_queue_pips.size = Vector2(w, 12.0)
+	_queue_pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_queue_pips.draw.connect(_draw_queue)
+	_root.add_child(_queue_pips)
+	_queue = _label("", Vector2(x, p.position.y + 136.0), w, 8, DIM, true)
+	_nudge = _label("", Vector2(x, p.position.y + 158.0), w, 10, INK)
+	_tokens = _label("", Vector2(x, p.position.y + 176.0), w, 14, GOLD)
 
 	# Fever lives here rather than beside MULT because this panel is the
 	# fast-moving one, and fever is the fastest number in the game -- it climbs
 	# on every contact and falls off a cliff two seconds later.
-	_label("FEVER", Vector2(x, p.position.y + 176.0), w, 8, DIM)
-	_fever = _label("x1", Vector2(x, p.position.y + 186.0), w, 20, FEVER_COLOUR)
+	_label("FEVER", Vector2(x, p.position.y + 200.0), w, 8, DIM)
+	_fever = _label("x1", Vector2(x, p.position.y + 210.0), w, 20, FEVER_COLOUR)
 
 	var fever_track := ColorRect.new()
-	fever_track.position = Vector2(x, p.position.y + 212.0)
+	fever_track.position = Vector2(x, p.position.y + 236.0)
 	fever_track.size = Vector2(w, 4.0)
 	fever_track.color = Color(0.14, 0.14, 0.21)
 	fever_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -352,6 +370,8 @@ func _refresh() -> void:
 
 	_mult.text = "x%s" % _trim(Run.effective_mult())
 	_balls.text = "BALLS  %s" % _pips(Run.balls_left, Run.balls_for_stage())
+	_queue.text = _queue_text()
+	_queue_pips.queue_redraw()
 	_tokens.text = "$%d" % Run.tokens
 
 	for i in _slots.size():
@@ -382,6 +402,48 @@ func _refresh() -> void:
 			text.text = "%d  --" % (i + 1)
 			text.add_theme_color_override("font_color", DIM)
 			_consumable_slots[i].color = EMPTY_SLOT
+
+
+## The ball in play followed by everything still to come. Before the first
+## plunge there is no head, only a queue.
+func _queue_ids() -> Array:
+	var ids: Array = []
+	if Run.ball_in_play():
+		ids.append(Run.current_ball)
+	ids.append_array(Run.ball_queue)
+	return ids
+
+
+## "GOLD > EMBER, VANILLA". The trailing "BALL" in every name is dropped: in a
+## row of balls it is the one word that never distinguishes one from another.
+## Vanilla is written out rather than blanked, because an absent name reads as
+## missing information where "VANILLA" reads as a plain ball, which is what it is.
+func _queue_text() -> String:
+	var names: Array[String] = []
+	for id in _queue_ids():
+		names.append(str(Catalog.BALLS[id]["name"]).to_upper().trim_suffix(" BALL"))
+	if names.is_empty():
+		return ""
+	if not Run.ball_in_play() or names.size() == 1:
+		return ", ".join(names)
+	return "%s > %s" % [names[0], ", ".join(names.slice(1))]
+
+
+## One pip per ball, in that ball's own colour. The ball in play is drawn full
+## size with a halo; the ones behind it are smaller and dimmed, so the row reads
+## as a queue moving left rather than as a set of equals.
+func _draw_queue() -> void:
+	var ids := _queue_ids()
+	var y := 6.0
+	for i in ids.size():
+		var colour: Color = Catalog.BALL_COLOURS.get(ids[i], INK)
+		var centre := Vector2(PIP_RADIUS + float(i) * PIP_PITCH, y)
+		var lead := i == 0 and Run.ball_in_play()
+		if lead:
+			_queue_pips.draw_circle(centre, PIP_RADIUS + 2.0, Color(colour, 0.3))
+			_queue_pips.draw_circle(centre, PIP_RADIUS, colour)
+		else:
+			_queue_pips.draw_circle(centre, PIP_RADIUS - 1.0, colour.darkened(0.4))
 
 
 func toast(text: String) -> void:
@@ -470,8 +532,44 @@ func show_shop(offers: Array) -> void:
 		if Run.consumables[i] != "":
 			own_col.add_child(_sell_button("consumable", Run.consumables[i], i))
 
+	own_col.add_child(_head("BALLS  %d/%d" % [_owned_balls(), Run.BALL_SLOTS]))
+	for i in Run.ball_slots.size():
+		own_col.add_child(_ball_slot_row(i))
+
 	_overlay_body.add_child(_body_line("Click to buy or sell.", DIM))
 	_add_continue("NEXT BLIND")
+
+
+func _owned_balls() -> int:
+	var n := 0
+	for id in Run.ball_slots:
+		if id != Catalog.VANILLA:
+			n += 1
+	return n
+
+
+## A ball slot: sellable if it holds something, and plain text if it is Vanilla,
+## since selling an empty slot is not an action.
+func _ball_slot_row(index: int) -> Control:
+	var id: String = Run.ball_slots[index]
+	var def: Dictionary = Catalog.BALLS[id]
+	if id == Catalog.VANILLA:
+		var l := _body_line("%d.  Vanilla" % (index + 1), DIM)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		return l
+	var lvl := Run.ball_level(id)
+	var b := Button.new()
+	b.add_theme_font_size_override("font_size", 9)
+	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	b.clip_text = true
+	b.custom_minimum_size = Vector2(196.0, 0.0)
+	var name := str(def["name"])
+	if lvl > 1:
+		name += " Lv%d" % lvl
+	b.text = "%d. %s  sell $%d" % [index + 1, name, Catalog.ball_sell_price(id, lvl)]
+	b.tooltip_text = str(def["desc"])
+	b.pressed.connect(sold.emit.bind("ball", index))
+	return b
 
 
 func _head(text: String) -> Label:

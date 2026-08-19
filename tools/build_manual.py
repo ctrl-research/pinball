@@ -69,6 +69,15 @@ def build(data):
         [(m["name"], m["desc"], "$%d" % m["cost"])
          for m in sorted(data["mods"], key=lambda m: m["cost"])])
 
+    # Vanilla is listed last rather than by price: it is the empty slot, not a
+    # cheap ball, and sorting by cost would put it at the top of the shelf.
+    balls = sorted(data["balls"], key=lambda b: (b["cost"] == 0, b["cost"], b["name"]))
+    blocks["balls"] = table(
+        ["Ball", "Effect", "Buy", "Sell"],
+        [(b["name"], b["desc"],
+          "-" if not b["cost"] else "$%d" % b["cost"],
+          "-" if not b["cost"] else "$%d" % b["sell"]) for b in balls])
+
     blocks["bosses"] = table(
         ["Boss blind", "Effect"],
         [(b["name"], b["desc"]) for b in data["bosses"]])
@@ -91,6 +100,9 @@ def build(data):
             ("Consumable slots", lim["consumables"]),
             ("Consumables per slot", lim["stack"]),
             ("Balls per stage", lim["balls"]),
+            ("Ball slots", lim["ball_slots"]),
+            ("Ball upgrade", "$%d, +$%d per level owned"
+                % (lim["ball_upgrade"], lim["ball_upgrade_step"])),
             ("Nudges held", lim["nudges"]),
             ("Nudge recharge", "%gs each" % lim["nudge_recharge"]),
             ("Payout multiplier cap", "x%d" % lim["payout_cap"]),

@@ -146,7 +146,8 @@ func _on_bought(index: int) -> void:
 func _on_sold(kind: String, index: int) -> void:
 	if state != State.SHOP:
 		return
-	if Run.sell(kind, index) > 0:
+	var paid := Run.sell_ball(index) if kind == "ball" else Run.sell(kind, index)
+	if paid > 0:
 		Sfx.play("buy")
 		# Rebuilt rather than patched: selling can re-enable a "FULL" offer, so
 		# the buy column is stale too.

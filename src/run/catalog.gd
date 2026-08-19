@@ -180,6 +180,80 @@ const CONSUMABLES = {
 	},
 }
 
+# --- Balls --------------------------------------------------------------------
+
+## The ball itself as a modifier layer.
+##
+## Every other layer changes the rules around the ball; this one changes the
+## thing in play. It is also the only layer with *randomness* in it: the balls a
+## stage serves are drawn from the slot ratio, so buying one is buying odds
+## rather than a guarantee.
+##
+## Vanilla is the empty slot rather than a purchasable ball. Five slots start
+## full of it, buying a ball fills the first vanilla slot, and selling one turns
+## that slot back into vanilla -- so the "inventory" and the "draw weights" are
+## the same five things, which is what keeps the odds legible.
+const VANILLA := "vanilla"
+
+const BALLS = {
+	VANILLA: {
+		"name": "Vanilla", "desc": "No bonus", "cost": 0,
+	},
+	"ember": {
+		"name": "Ember Ball", "desc": "Fever builds twice as fast", "cost": 6,
+	},
+	"heavy": {
+		"name": "Heavy Ball", "desc": "Larger: fits no outlane, drains less", "cost": 6,
+	},
+	"lucky": {
+		"name": "Lucky Ball", "desc": "Pays $1 per 500 points scored", "cost": 6,
+	},
+	"gold": {
+		"name": "Gold Ball", "desc": "Hits score x2", "cost": 7,
+	},
+	"ghost": {
+		"name": "Ghost Ball", "desc": "Survives its first drain", "cost": 8,
+	},
+}
+
+## What each ball looks like in the lane, so the player can tell at a glance
+## which one they have been dealt.
+const BALL_COLOURS = {
+	VANILLA: Color(0.78, 0.80, 0.86),
+	"ember": Color(0.98, 0.55, 0.30),
+	"heavy": Color(0.58, 0.60, 0.70),
+	"lucky": Color(0.55, 0.92, 0.65),
+	"gold": Color(1.0, 0.82, 0.32),
+	"ghost": Color(0.70, 0.78, 1.0),
+}
+
+## Levels scale a ball's effect rather than granting a new one, so an upgrade is
+## always legible: more of what that ball already did.
+const BALL_UPGRADE_COST := 5
+const BALL_UPGRADE_STEP := 2  ## cost grows by this per level already bought
+
+
+static func ball_upgrade_cost(level: int) -> int:
+	return BALL_UPGRADE_COST + BALL_UPGRADE_STEP * maxi(0, level - 1)
+
+
+## Everything a ball at `level` cost to get there: its shelf price plus every
+## upgrade bought on the way.
+static func ball_total_cost(id: String, level: int) -> int:
+	if not BALLS.has(id):
+		return 0
+	var total := int(BALLS[id]["cost"])
+	for l in range(1, maxi(1, level)):
+		total += ball_upgrade_cost(l)
+	return total
+
+
+## The same three-quarters rule every other sale uses, applied to what the ball
+## actually cost rather than to its shelf price alone.
+static func ball_sell_price(id: String, level: int) -> int:
+	return int(floor(float(ball_total_cost(id, level)) * SELL_FRACTION))
+
+
 # --- Table mods ---------------------------------------------------------------
 
 ## Permanent changes to the physical playfield -- the roguelike lever pinball
@@ -217,7 +291,11 @@ const SELL_FRACTION := 0.75
 
 
 static func sell_price(kind: String, id: String) -> int:
-	var table: Dictionary = TRINKETS if kind == "trinket" else CONSUMABLES
+	var table: Dictionary = TRINKETS
+	if kind == "consumable":
+		table = CONSUMABLES
+	elif kind == "ball":
+		table = BALLS
 	if not table.has(id):
 		return 0
 	return int(floor(float(table[id]["cost"]) * SELL_FRACTION))

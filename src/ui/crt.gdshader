@@ -27,13 +27,23 @@ uniform float gain : hint_range(0.5, 2.0) = 1.16;
 // Signal wobble. A tube never held a perfectly straight line, and a slow lateral
 // wave is the cheapest way to say "this is being transmitted, not drawn".
 //
-// The amplitude is about one pixel at the design resolution. It has to be: the
-// panels carry 8px text, and a wave big enough to notice on a title is a wave
-// that makes a score unreadable. What sells it is that the *whole frame* moves
-// together -- the eye reads coherent motion long before it can measure it.
-uniform float wave_amount : hint_range(0.0, 0.01) = 0.0011;
-uniform float wave_speed : hint_range(0.0, 8.0) = 1.7;
-uniform float wave_freq : hint_range(0.0, 40.0) = 7.0;
+// Two waves, not one, and that is the whole trick.
+//
+// A single wave displaces the entire frame together, and a frame that moves as
+// one rigid thing is invisible no matter how far it moves -- there is nothing
+// to see it against. The first version was exactly that, and at a pixel of
+// amplitude it may as well not have been running.
+//
+// The second wave is much higher-frequency, so neighbouring scanlines shift by
+// *different* amounts. That is relative motion, and relative motion is what the
+// eye actually reads as wobble. It can therefore stay small enough not to smear
+// 8px text while being clearly visible on it.
+uniform float wave_amount : hint_range(0.0, 0.01) = 0.0020;
+uniform float wave_speed : hint_range(0.0, 8.0) = 1.5;
+uniform float wave_freq : hint_range(0.0, 40.0) = 5.0;
+uniform float ripple_amount : hint_range(0.0, 0.005) = 0.0009;
+uniform float ripple_speed : hint_range(0.0, 20.0) = 6.0;
+uniform float ripple_freq : hint_range(0.0, 400.0) = 130.0;
 
 // Phosphor glow. This is the part that actually reads on text: a CRT's beam
 // blooms into its neighbours, so bright glyphs bleed a halo and thin strokes
@@ -79,8 +89,10 @@ void fragment() {
 	vec2 uv = curve(SCREEN_UV);
 
 	// Applied after the curve so the wobble rides on top of the glass rather
-	// than fighting it.
+	// than fighting it. The slow wave carries the whole frame; the fast ripple
+	// is what makes it legible as motion.
 	uv.x += sin(uv.y * wave_freq + TIME * wave_speed) * wave_amount;
+	uv.x += sin(uv.y * ripple_freq + TIME * ripple_speed) * ripple_amount;
 
 	// Outside the curved glass is the inside of the bezel, not the game.
 	if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
