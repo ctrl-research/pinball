@@ -21,7 +21,8 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
 
 ```
 .
-├── docs/game-design.md
+├── docs/game-design.md      # why the rules are what they are
+├── docs/manual.md           # what the rules are; tables generated from catalog
 ├── project.godot            # 120Hz physics, 480px/s^2 gravity, input map
 ├── export_presets.cfg       # Web preset; committed, CI exports from it
 ├── scenes/                  # root node + script only, deliberately trivial
@@ -79,6 +80,12 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
 - **Screen layout lives in `cabinet.gd`.** Panels are positioned relative to the
   machine, so there is one source for it. `Cabinet.TOP_SCALE` is shared with the
   shader and the two must agree, or the rails stop lining up with the playfield.
+- **Font sizes should be multiples of 8.** Silkscreen is drawn on an 8px grid;
+  off-grid sizes resample and lose columns (at 7px the W reads as a different
+  glyph). The typeface is set once on the default theme in
+  `src/autoload/style.gd` — note that `ThemeDB.fallback_font` alone does
+  nothing, because the default theme ships its own `default_font` and a theme
+  always wins over the fallback.
 - **Building a Label in code: set `autowrap_mode` before `size`.** A Label grows
   to its own minimum size, and an unwrapped Label's minimum width is the full
   width of its text — setting autowrap afterwards is too late, and a long line
@@ -92,6 +99,20 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
   Godot only preventDefaults keys that reach the canvas, so anything that moves
   focus or the visual viewport hands the keyboard back to the browser. If the
   view ever seems to pan or zoom on its own, start there.
+- **`docs/manual.md` is the mechanics reference and must stay true.** Its
+  tables are generated from `catalog.gd` by `tools/build_manual.py`, and CI
+  fails if they drift — so changing a cost, an effect or a limit means
+  regenerating, not retyping:
+
+  ```sh
+  godot --headless --path . tools/dump_catalog.tscn > /tmp/catalog.json
+  python3 tools/build_manual.py /tmp/catalog.json
+  ```
+
+  Prose *outside* the `BEGIN GENERATED` markers is hand-written and is never
+  touched by the tool — a new mechanic that is not just a catalog entry (a
+  control, a rule, a physics change) needs a paragraph written by hand.
+  `game-design.md` stays the *rationale*; the manual is the *rules*.
 - Versioning: bare `X.Y.Z`, no `v` prefix. `MAJOR.MINOR` from `./VERSION`.
 - Branch protection: never push directly to `main`; all changes via PR.
 - Commit style: conventional commits, see `CONTRIBUTING.md`.

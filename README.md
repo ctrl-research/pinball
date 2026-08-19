@@ -9,8 +9,9 @@ trinkets, a shop after everything — poured into a pinball cabinet, with the
 tactile layer of *3D Pinball: Space Cadet* underneath it: flippers, plunger,
 nudge, tilt.
 
-See [docs/game-design.md](docs/game-design.md) for the full design and
-[docs/roadmap.md](docs/roadmap.md) for what gets built in what order.
+See [docs/manual.md](docs/manual.md) for every mechanic as it currently
+behaves, [docs/game-design.md](docs/game-design.md) for why it works that way,
+and [docs/roadmap.md](docs/roadmap.md) for what gets built in what order.
 
 ## Controls
 
@@ -115,6 +116,7 @@ src/
 │   ├── layout.gd     # the machine, as numbers
 │   ├── table.gd      # builds it; plunger, nudge, drain, boss hazards
 │   ├── ball.gd  flipper.gd  bumper.gd  slingshot.gd  target.gd  sensor.gd
+├── autoload/style.gd # the project-wide pixel typeface, set on the theme
 ├── ui/
 │   ├── cabinet.gd            # rails, lockdown bar, backbox, screen layout
 │   ├── perspective.gdshader  # the trapezoid warp

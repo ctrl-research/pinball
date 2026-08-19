@@ -545,6 +545,23 @@ inserts, a segmented-LED score readout on the panel.
   is the mildest setting of all, because it sits on top of the playfield's own
   perspective warp and two distortions arguing with each other look like a bug.
 
+- **The type is pixel type.** Silkscreen Bold (SIL OFL 1.1) is the project-wide
+  default, set once on the theme in `src/autoload/style.gd` rather than as an
+  override on every label — nothing in the UI asks for a font by name, only for
+  sizes, so the whole game restyles from one line.
+
+  Balatro's own face is m6x11 by Daniel Linssen, and the nearest openly-licensed
+  match, Pixelify Sans, was tried first and rejected on legibility rather than
+  taste: at every size from 7 to 24 it drew "BEAT" as "GEAT" and "flip" as
+  "Aip". A font that cannot spell BEAT is not a candidate however well it
+  matches a reference.
+
+  Silkscreen is drawn on an **8px grid**, so sizes that are multiples of 8 land
+  on whole pixels and anything else resamples. New text should prefer 8, 16 and
+  24. It also draws lowercase as small caps, which means the whole interface
+  reads as capitals — arcade-appropriate, and a real change to the tone of the
+  longer menu prose.
+
 - **Art is not pixel art yet.** Everything on the playfield is currently drawn
   from the same `TableLayout` numbers that generate its collision, at 640×360
   with nearest filtering. That is chunky and readable and it cannot drift out

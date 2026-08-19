@@ -158,7 +158,7 @@ func _build_backbox() -> void:
 	_blind = _label("", Vector2(box.position.x, box.position.y + 24.0), box.size.x, 10, INK)
 	_blind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_boss = _label("", Vector2(box.position.x + 4.0, box.position.y + 40.0),
-		box.size.x - 8.0, 7, RED, true)
+		box.size.x - 8.0, 8, RED, true)
 	_boss.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
@@ -208,7 +208,7 @@ func _slot(pos: Vector2, w: float, h: float) -> ColorRect:
 	text.custom_minimum_size = Vector2(w - 8.0, 0.0)
 	text.position = Vector2(4, 2)
 	text.size = Vector2(w - 8.0, h - 4.0)
-	text.add_theme_font_size_override("font_size", 7)
+	text.add_theme_font_size_override("font_size", 8)
 	text.clip_text = true
 	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.add_child(text)
@@ -270,7 +270,7 @@ func _build_right() -> void:
 
 	_label("A / D  flippers\nSPACE  hold to plunge\nQ / W / E  nudge\n1 / 2 / 3  consumables\n\n"
 		+ "Nudge on empty and it tilts.",
-		Vector2(x, p.position.y + 274.0), w, 7, DIM, true)
+		Vector2(x, p.position.y + 270.0), w, 8, DIM, true)
 
 
 ## `wrap` is applied before the size is set, and that order matters: a Label
