@@ -15,6 +15,7 @@ Hand-written prose lives outside the markers and is never touched.
 
 Stdlib only, like every other tool here.
 """
+import base64
 import html
 import json
 import re
@@ -23,6 +24,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MANUAL = ROOT / "docs" / "manual.md"
+# The same face the game renders in. Embedded rather than linked so the page is
+# a single self-contained file that works from Pages, from a local checkout, or
+# emailed to someone -- a manual that only looks right on one host is a manual
+# that will eventually look wrong.
+FONT = ROOT / "assets" / "fonts" / "Jersey25.ttf"
 
 BEGIN = "<!-- BEGIN GENERATED: %s -->"
 END = "<!-- END GENERATED: %s -->"
@@ -97,28 +103,39 @@ def build(data):
 
 # --- markdown -> html ---------------------------------------------------------
 
+FONT_FACE = """
+@font-face {
+  font-family: 'TiltPixel';
+  src: url('data:font/ttf;base64,%s') format('truetype');
+  font-display: block;
+}
+"""
+
 STYLE = """
 :root { color-scheme: dark; }
 body { margin:0; padding:2.5rem 1.25rem 5rem; background:#0b0a10; color:#dcdff5;
-  font:16px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  max-width:52rem; margin-inline:auto; }
+  font:20px/1.75 'TiltPixel', ui-monospace, Menlo, monospace;
+  max-width:52rem; margin-inline:auto;
+  /* The face is a pixel font; smoothing it defeats the point. */
+  -webkit-font-smoothing:none; font-smooth:never; }
 h1,h2,h3 { color:#ffd24f; line-height:1.25; margin:2.2em 0 .6em; }
-h1 { font-size:2rem; border-bottom:2px solid #2a2740; padding-bottom:.4em; margin-top:0; }
-h2 { font-size:1.3rem; border-bottom:1px solid #2a2740; padding-bottom:.3em; }
-h3 { font-size:1.05rem; color:#8fd8e8; }
+h1 { font-size:40px; border-bottom:2px solid #2a2740; padding-bottom:.4em; margin-top:0; }
+h2 { font-size:28px; border-bottom:1px solid #2a2740; padding-bottom:.3em; }
+h3 { font-size:22px; color:#8fd8e8; }
 a { color:#8fd8e8; }
-code { background:#181628; padding:.1em .35em; border-radius:3px; font-size:.9em; }
+code { background:#181628; padding:.1em .35em; border-radius:3px; font-size:18px; }
 pre { background:#181628; border:1px solid #2a2740; border-radius:4px;
   padding:.8em 1em; overflow-x:auto; }
 pre code { background:none; padding:0; }
-table { border-collapse:collapse; width:100%; margin:1.2em 0; font-size:.88rem;
+table { border-collapse:collapse; width:100%; margin:1.2em 0; font-size:18px;
   display:block; overflow-x:auto; }
 th,td { border:1px solid #2a2740; padding:.45em .7em; text-align:left; vertical-align:top; }
 th { background:#181628; color:#ffd24f; }
 tr:nth-child(even) td { background:#100e1a; }
-blockquote { border-left:3px solid #3a3658; margin:1em 0; padding:.1em 1em; color:#a8abc4; }
+blockquote { border-left:3px solid #3a3658; margin:1em 0; padding:.1em 1em; color:#a8abc4;
+  font-size:18px; }
 hr { border:0; border-top:1px solid #2a2740; margin:2.5em 0; }
-.note { color:#8a8da8; font-size:.85rem; }
+.note { color:#8a8da8; font-size:16px; }
 """
 
 
@@ -129,6 +146,14 @@ def inline(text):
     text = re.sub(r"(?<![*\w])\*([^*]+)\*(?!\*)", r"<em>\1</em>", text)
     text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', text)
     return text
+
+
+def font_face():
+    """The game's font, inlined. Falls back to a plain monospace stack if the
+    file is missing, so the manual still builds in a checkout without assets."""
+    if not FONT.exists():
+        return ""
+    return FONT_FACE % base64.b64encode(FONT.read_bytes()).decode("ascii")
 
 
 def to_html(md, title):
@@ -188,8 +213,8 @@ def to_html(md, title):
             i += 1
     return ("<!doctype html><html lang=en><head><meta charset=utf-8>"
             "<meta name=viewport content='width=device-width,initial-scale=1'>"
-            "<title>%s</title><style>%s</style></head><body>%s</body></html>"
-            % (html.escape(title), STYLE, "\n".join(out)))
+            "<title>%s</title><style>%s%s</style></head><body>%s</body></html>"
+            % (html.escape(title), font_face(), STYLE, "\n".join(out)))
 
 
 # --- main ---------------------------------------------------------------------
