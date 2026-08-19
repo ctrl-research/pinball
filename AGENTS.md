@@ -21,7 +21,8 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
 
 ```
 .
-├── docs/game-design.md
+├── docs/game-design.md      # why the rules are what they are
+├── docs/manual.md           # what the rules are; tables generated from catalog
 ├── project.godot            # 120Hz physics, 480px/s^2 gravity, input map
 ├── export_presets.cfg       # Web preset; committed, CI exports from it
 ├── scenes/                  # root node + script only, deliberately trivial
@@ -98,6 +99,20 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
   Godot only preventDefaults keys that reach the canvas, so anything that moves
   focus or the visual viewport hands the keyboard back to the browser. If the
   view ever seems to pan or zoom on its own, start there.
+- **`docs/manual.md` is the mechanics reference and must stay true.** Its
+  tables are generated from `catalog.gd` by `tools/build_manual.py`, and CI
+  fails if they drift — so changing a cost, an effect or a limit means
+  regenerating, not retyping:
+
+  ```sh
+  godot --headless --path . tools/dump_catalog.tscn > /tmp/catalog.json
+  python3 tools/build_manual.py /tmp/catalog.json
+  ```
+
+  Prose *outside* the `BEGIN GENERATED` markers is hand-written and is never
+  touched by the tool — a new mechanic that is not just a catalog entry (a
+  control, a rule, a physics change) needs a paragraph written by hand.
+  `game-design.md` stays the *rationale*; the manual is the *rules*.
 - Versioning: bare `X.Y.Z`, no `v` prefix. `MAJOR.MINOR` from `./VERSION`.
 - Branch protection: never push directly to `main`; all changes via PR.
 - Commit style: conventional commits, see `CONTRIBUTING.md`.
