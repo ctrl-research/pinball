@@ -59,6 +59,13 @@ func _ready() -> void:
 			"at": Vector2(240, 250), "want_outlane": true,
 			"box": Rect2(130, 282, 44, 42),
 		},
+		# With the Wormhole open the bottom of the table stops being the end of
+		# the ball: it goes down the outlane and comes back up the plunger lane.
+		{
+			"name": "wormhole returns a drained ball to the plunger",
+			"at": Vector2(14, 250), "want_outlane": true, "wormhole": true,
+			"box": Rect2(130, 282, 44, 42),
+		},
 	]
 	_next_case()
 
@@ -75,6 +82,9 @@ func _next_case() -> void:
 		if is_instance_valid(b):
 			b.queue_free()
 	_table.balls.clear()
+	Run.effects.erase("wormhole")
+	if bool(_cases[_index].get("wormhole", false)):
+		Run.effects["wormhole"] = Time.get_ticks_msec() + 60_000
 	_ball = _table.spawn_ball_at(_cases[_index]["at"])
 
 
@@ -93,7 +103,20 @@ func _physics_process(_delta: float) -> void:
 	if _frames < SETTLE_FRAMES:
 		return
 
-	if bool(case["want_outlane"]):
+	if bool(case.get("wormhole", false)):
+		# Survival is the whole point here, not routing.
+		var alive := is_instance_valid(_ball) and _table.balls.has(_ball)
+		if not alive:
+			_fail("%s -- the ball was lost anyway" % case["name"])
+		elif not _went_outlane:
+			_fail("%s -- never reached the outlane, so nothing was returned"
+				% case["name"])
+		elif not _ball.in_plunger_lane:
+			_fail("%s -- survived but ended at %s, not the plunger"
+				% [case["name"], _ball.position.round()])
+		else:
+			print("  ok: %s" % case["name"])
+	elif bool(case["want_outlane"]):
 		if not _went_outlane:
 			_fail("%s -- never entered the outlane" % case["name"])
 		elif _reached_flipper:

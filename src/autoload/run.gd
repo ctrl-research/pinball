@@ -15,6 +15,7 @@ signal consumables_changed
 signal tokens_changed
 signal stage_changed
 signal nudges_changed
+signal fever_changed
 signal ball_awarded  ## a trinket conjured an extra ball onto the playfield
 signal toast(text: String)
 
@@ -30,6 +31,24 @@ const BASE_BALLS := 3
 const MAX_NUDGES := 2
 const NUDGE_RECHARGE := 5.0  # seconds per nudge
 const COMBO_WINDOW := 1.5
+
+## --- Fever ---
+##
+## A short-term combo multiplier, stacked on top of MULT rather than folded into
+## it. The two answer different questions: MULT is the ball you have built over
+## twenty seconds and lose on the drain, fever is the last two seconds. Keeping
+## them separate is what makes a bumper nest feel different from a slow ball
+## that has been alive a while, and lets the readout show both.
+##
+## Score is value x MULT x FEVER, so the cap matters: uncapped, a bumper nest
+## with a stacked MULT would produce numbers that make the ante curve
+## meaningless.
+const FEVER_BASE := 1.0
+const FEVER_STEP := 0.25
+const FEVER_MAX := 5.0
+## Two seconds of no contact and it is gone. Short enough that it has to be kept
+## alive deliberately, long enough to survive a trip round the orbit.
+const FEVER_WINDOW := 2.0
 
 # --- Run-scoped state ---------------------------------------------------------
 
@@ -88,6 +107,8 @@ var _hits_this_ball := 0
 var _bumper_hits := 0
 var _spinner_bonus := 0
 var _last_hit_time := -999.0
+var fever := FEVER_BASE
+var _fever_expires := 0.0
 var _hits_since_jackpot := 0
 var _hits_since_reset := 0
 var _penny_progress := 0
@@ -103,6 +124,7 @@ const SLOW_SCALE := 0.55
 
 func _process(delta: float) -> void:
 	_expire_effects()
+	_expire_fever()
 	# Derived every frame rather than set on use and unset on expiry. A leaked
 	# time scale means the whole game runs slow forever, and deriving it makes
 	# that unreachable -- there is no path where it is set and not cleared.
@@ -170,6 +192,9 @@ func begin_ball() -> void:
 	_bumper_hits = 0
 	_spinner_bonus = 0
 	_last_hit_time = -999.0
+	fever = FEVER_BASE
+	_fever_expires = 0.0
+	fever_changed.emit()
 	_hits_since_jackpot = 0
 	_hits_since_reset = 0
 	mult_changed.emit()
@@ -318,8 +343,6 @@ func register_hit(source: int, count: int = 1) -> int:
 
 	# --- per-hit trinket and boss hooks ---
 	var now := float(Time.get_ticks_msec()) / 1000.0
-	if has_trinket("combo_coil") and now - _last_hit_time <= COMBO_WINDOW:
-		add_mult(0.2)
 	_last_hit_time = now
 
 	if _hits_this_ball == 0 and has_trinket("skill_shot"):
@@ -336,17 +359,36 @@ func register_hit(source: int, count: int = 1) -> int:
 
 	if effect_active("jackpot_charge"):
 		value += 500.0
-	var points := int(round(value * effective_mult()))
+	# value x MULT x FEVER. Fever is applied last so the readout reads left to
+	# right in the same order the arithmetic happens.
+	var points := int(round(value * effective_mult() * fever))
 
 	if has_trinket("jackpot_lamp"):
 		_hits_since_jackpot += count
 		if _hits_since_jackpot >= 8:
 			_hits_since_jackpot -= 8
-			points += int(round(Catalog.source_value(Catalog.Source.JACKPOT, 1) * effective_mult()))
+			points += int(round(
+				Catalog.source_value(Catalog.Source.JACKPOT, 1) * effective_mult() * fever))
 			toast.emit("JACKPOT")
 
 	_bank(points)
+	# Stoked *after* the hit is scored, so the contact that starts a combo is
+	# worth its base value and only the ones that follow are worth more. Stoking
+	# first would mean a single isolated hit already scored above base, which is
+	# not what "combo" means to anyone.
+	_stoke_fever()
 	return points
+
+
+## Called on every scoring contact. Combo Coil now feeds this rather than MULT:
+## a trinket that granted +0.2 MULT on quick hits was solving the same problem
+## fever solves, and two systems for "you are hitting things quickly" is one
+## more than the player can read.
+func _stoke_fever() -> void:
+	var step := FEVER_STEP * (2.0 if has_trinket("combo_coil") else 1.0)
+	fever = minf(FEVER_MAX, fever + step)
+	_fever_expires = float(Time.get_ticks_msec()) + FEVER_WINDOW * 1000.0
+	fever_changed.emit()
 
 
 func _bank(points: int) -> void:
@@ -431,6 +473,25 @@ func effect_remaining(id: String) -> float:
 	if not effects.has(id):
 		return 0.0
 	return maxf(0.0, (float(effects[id]) - float(Time.get_ticks_msec())) / 1000.0)
+
+
+## Fever decays as a cliff, not a slope. A slow bleed would mean the number is
+## always slightly wrong and never worth reading; falling off a cliff after two
+## silent seconds is a rule you can play around.
+func _expire_fever() -> void:
+	if fever <= FEVER_BASE:
+		return
+	if float(Time.get_ticks_msec()) >= _fever_expires:
+		fever = FEVER_BASE
+		fever_changed.emit()
+		toast.emit("FEVER LOST")
+
+
+## Seconds left before fever drops, for the readout.
+func fever_remaining() -> float:
+	if fever <= FEVER_BASE:
+		return 0.0
+	return maxf(0.0, (_fever_expires - float(Time.get_ticks_msec())) / 1000.0)
 
 
 func _expire_effects() -> void:

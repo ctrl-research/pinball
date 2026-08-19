@@ -25,6 +25,7 @@ const SLOT_GAP := 3.0
 const INK := Color(0.86, 0.88, 0.96)
 const DIM := Color(0.46, 0.48, 0.62)
 const GOLD := Color(1.0, 0.82, 0.32)
+const FEVER_COLOUR := Color(1.0, 0.45, 0.55)
 const RED := Color(0.94, 0.36, 0.40)
 const PANEL_BG := Color(0.055, 0.052, 0.082)
 const PANEL_EDGE := Color(0.15, 0.15, 0.22)
@@ -43,6 +44,8 @@ var _balls: Label
 var _nudge: Label
 var _tokens: Label
 var _status: Label
+var _fever: Label
+var _fever_bar: ColorRect
 var _toast_label: Label
 var _progress: ColorRect
 var _slots: Array[Control] = []
@@ -73,6 +76,13 @@ func _process(delta: float) -> void:
 	# Nudge recharges continuously and effects count down, so neither readout
 	# can be signal-driven.
 	_nudge.text = "NUDGE  %s" % _pips(int(Run.nudges), Run.MAX_NUDGES)
+
+	var fever := Run.fever
+	_fever.text = "x%s" % _trim(fever)
+	_fever.add_theme_color_override("font_color",
+		FEVER_COLOUR if fever > 1.0 else DIM)
+	_fever_bar.size.x = (Cabinet.PANEL_RIGHT.size.x - 8.0) * clampf(
+		Run.fever_remaining() / Run.FEVER_WINDOW, 0.0, 1.0)
 
 	var row := 0
 	for id in Run.effects:
@@ -236,6 +246,27 @@ func _build_right() -> void:
 	_balls = _label("", Vector2(x, p.position.y + 108.0), w, 10, INK)
 	_nudge = _label("", Vector2(x, p.position.y + 126.0), w, 10, INK)
 	_tokens = _label("", Vector2(x, p.position.y + 146.0), w, 14, GOLD)
+
+	# Fever lives here rather than beside MULT because this panel is the
+	# fast-moving one, and fever is the fastest number in the game -- it climbs
+	# on every contact and falls off a cliff two seconds later.
+	_label("FEVER", Vector2(x, p.position.y + 176.0), w, 8, DIM)
+	_fever = _label("x1", Vector2(x, p.position.y + 186.0), w, 20, FEVER_COLOUR)
+
+	var fever_track := ColorRect.new()
+	fever_track.position = Vector2(x, p.position.y + 212.0)
+	fever_track.size = Vector2(w, 4.0)
+	fever_track.color = Color(0.14, 0.14, 0.21)
+	fever_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(fever_track)
+
+	# The bar is the *timer*, not the size of the multiplier: what the player
+	# needs to know mid-ball is how long they have left to keep it alive.
+	_fever_bar = ColorRect.new()
+	_fever_bar.size = Vector2(0.0, 4.0)
+	_fever_bar.color = FEVER_COLOUR
+	_fever_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fever_track.add_child(_fever_bar)
 
 	_label("A / D  flippers\nSPACE  hold to plunge\nQ / W / E  nudge\n1 / 2 / 3  consumables\n\n"
 		+ "Nudge on empty and it tilts.",

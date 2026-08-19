@@ -26,6 +26,7 @@ func _ready() -> void:
 	_inventory()
 	_consumables()
 	_slow_ball()
+	_fever()
 
 	if _failures > 0:
 		push_error("RUN_TEST_FAILED: %d check(s)" % _failures)
@@ -34,6 +35,16 @@ func _ready() -> void:
 		return
 	print("RUN_TEST_OK")
 	get_tree().quit(0)
+
+
+## Scores one hit from a standing start.
+##
+## Fever multiplies consecutive contacts, so a test measuring what a *bumper* is
+## worth would otherwise be measuring the combo it built one line earlier. The
+## fever tests use register_hit directly, because there the combo is the point.
+func _cold_hit(source: int, count: int = 1) -> int:
+	Run.fever = Run.FEVER_BASE
+	return Run.register_hit(source, count)
 
 
 func _check(condition: bool, what: String) -> void:
@@ -62,7 +73,7 @@ func _base_scoring() -> void:
 	_eq(Run.score, 10, "the hit banks immediately")
 
 	Run.add_mult(2.0)
-	_eq(Run.register_hit(Catalog.Source.BUMPER), 30, "bumper at MULT x3")
+	_eq(_cold_hit(Catalog.Source.BUMPER), 30, "bumper at MULT x3")
 	_eq(Run.score, 40, "score accumulates")
 
 	# A spinner rip scores per revolution, which is the whole reason the orbit
@@ -75,7 +86,7 @@ func _trinkets() -> void:
 	Run.new_run(1003)
 	Run.add_trinket("brass_bumper")
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 30, "Brass Bumper triples bumpers")
-	_eq(Run.register_hit(Catalog.Source.SLINGSHOT), 15, "and leaves slingshots alone")
+	_eq(_cold_hit(Catalog.Source.SLINGSHOT), 15, "and leaves slingshots alone")
 
 	Run.new_run(1004)
 	Run.add_trinket("slingshot_savant")
@@ -84,7 +95,7 @@ func _trinkets() -> void:
 	Run.new_run(1005)
 	Run.add_trinket("skill_shot")
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 50, "Skill Shot x5 on the first hit")
-	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "and only the first hit")
+	_eq(_cold_hit(Catalog.Source.BUMPER), 10, "and only the first hit")
 
 	Run.new_run(1006)
 	Run.add_trinket("cold_solder")
@@ -111,7 +122,7 @@ func _levels() -> void:
 	Run.level_up(Catalog.Source.BUMPER)
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 18, "Bumpers Lv2 is 10 + 8")
 	Run.level_up(Catalog.Source.BUMPER)
-	_eq(Run.register_hit(Catalog.Source.BUMPER), 26, "Bumpers Lv3 is 10 + 16")
+	_eq(_cold_hit(Catalog.Source.BUMPER), 26, "Bumpers Lv3 is 10 + 16")
 
 
 func _bosses() -> void:
@@ -123,7 +134,7 @@ func _bosses() -> void:
 	Run.new_run(1011)
 	Run.boss_id = "dead_bumper"
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 0, "The Dead Bumper zeroes bumpers")
-	_eq(Run.register_hit(Catalog.Source.SLINGSHOT), 15, "but not slingshots")
+	_eq(_cold_hit(Catalog.Source.SLINGSHOT), 15, "but not slingshots")
 
 	Run.new_run(1012)
 	Run.boss_id = "no_tilt"
@@ -369,7 +380,7 @@ func _consumables() -> void:
 	_check(Run.use_consumable(0), "it can be fired")
 	_eq(Run.consumable_count(), 0, "and leaves the rack afterwards")
 	_check(Run.effect_active("ball_polish"), "the effect is running")
-	_eq(Run.register_hit(Catalog.Source.BUMPER), 20, "Ball Polish doubles values")
+	_eq(_cold_hit(Catalog.Source.BUMPER), 20, "Ball Polish doubles values")
 	_check(Run.effect_remaining("ball_polish") > 15.0, "with time left on it")
 
 	# Effects do not survive the stage.
@@ -444,3 +455,45 @@ func _slow_ball() -> void:
 
 	Run.begin_stage()
 	_check(not Run.effect_active("slow_ball"), "and a new stage ends it")
+
+
+## Fever: a short-term combo multiplier stacked on top of MULT.
+func _fever() -> void:
+	Run.new_run(1050)
+	_eq(Run.fever, Run.FEVER_BASE, "fever starts at x1")
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "the first hit is not yet feverish")
+	_eq(Run.fever, 1.25, "but it stokes the fever")
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 13, "and the next hit is worth more")
+
+	# It multiplies with MULT rather than replacing it.
+	Run.new_run(1051)
+	Run.add_mult(3.0)  # MULT x4
+	Run.register_hit(Catalog.Source.BUMPER)  # fever -> 1.25
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 50, "10 x MULT 4 x fever 1.25")
+
+	# Capped, or a bumper nest on a stacked MULT would break the ante curve.
+	Run.new_run(1052)
+	for i in 40:
+		Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.fever, Run.FEVER_MAX, "fever is capped")
+
+	# It expires on a cliff.
+	Run.new_run(1053)
+	Run.register_hit(Catalog.Source.BUMPER)
+	_check(Run.fever > Run.FEVER_BASE, "fever is up")
+	_check(Run.fever_remaining() > 0.0, "with time on it")
+	Run._fever_expires = float(Time.get_ticks_msec()) - 1.0
+	Run._expire_fever()
+	_eq(Run.fever, Run.FEVER_BASE, "and drops all the way back, not part way")
+
+	# A new ball starts cold.
+	Run.new_run(1054)
+	Run.register_hit(Catalog.Source.BUMPER)
+	Run.begin_ball()
+	_eq(Run.fever, Run.FEVER_BASE, "a new ball starts at x1")
+
+	# Combo Coil now feeds fever instead of MULT.
+	Run.new_run(1055)
+	Run.add_trinket("combo_coil")
+	Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.fever, 1.5, "Combo Coil builds fever twice as fast")
