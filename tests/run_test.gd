@@ -27,6 +27,7 @@ func _ready() -> void:
 	_consumables()
 	_slow_ball()
 	_fever()
+	_balls()
 
 	if _failures > 0:
 		push_error("RUN_TEST_FAILED: %d check(s)" % _failures)
@@ -497,3 +498,133 @@ func _fever() -> void:
 	Run.add_trinket("combo_coil")
 	Run.register_hit(Catalog.Source.BUMPER)
 	_eq(Run.fever, 1.5, "Combo Coil builds fever twice as fast")
+
+
+## Ball slots, the draw, and each ball's effect.
+func _balls() -> void:
+	Run.new_run(1060)
+	_eq(Run.ball_slots.size(), Run.BALL_SLOTS, "five slots")
+	for id in Run.ball_slots:
+		_eq(id, Catalog.VANILLA, "all Vanilla to start")
+
+	# Buying fills the first Vanilla slot; Vanilla *is* the empty slot.
+	_check(Run.add_ball("gold"), "a ball fits")
+	_eq(Run.ball_slots[0], "gold", "in slot 1")
+	_check(Run.add_ball("gold"), "duplicates are allowed")
+	_eq(Run.ball_slots[1], "gold", "in the next slot")
+	for i in 3:
+		Run.add_ball("ember")
+	_check(not Run.add_ball("ghost"), "the sixth is refused")
+
+	# Selling returns the slot to Vanilla rather than removing it.
+	Run.tokens = 0
+	_eq(Run.sell_ball(0), Catalog.ball_sell_price("gold", 1), "selling pays out")
+	_eq(Run.ball_slots[0], Catalog.VANILLA, "and the slot goes back to Vanilla")
+	_eq(Run.ball_slots.size(), Run.BALL_SLOTS, "still five slots")
+	_eq(Run.sell_ball(0), 0, "selling Vanilla pays nothing")
+
+	# The queue is drawn from the slots, one independent draw per ball.
+	Run.new_run(1061)
+	for i in Run.BALL_SLOTS:
+		Run.ball_slots[i] = "gold"
+	Run.roll_ball_queue()
+	_check(not Run.ball_in_play(), "nothing is in play until one is served")
+	_eq(Run.ball_queue.size(), Run.balls_for_stage(), "one draw per ball")
+	for id in Run.ball_queue:
+		_eq(id, "gold", "all Gold when every slot is Gold")
+
+	_eq(Run.take_next_ball(), "gold", "taking one gives the ball")
+	_eq(Run.ball_queue.size(), Run.balls_for_stage() - 1, "and shortens the queue")
+	Run.ball_queue.clear()
+	_eq(Run.take_next_ball(), Catalog.VANILLA, "an empty queue falls back to Vanilla")
+
+	# Gold multiplies value, and only while it is the ball in play.
+	Run.new_run(1062)
+	Run.current_ball = "gold"
+	_eq(_cold_hit(Catalog.Source.BUMPER), 20, "Gold doubles a bumper")
+	Run.upgrade_ball("gold")
+	_eq(Run.ball_level("gold"), 2, "an upgrade raises the level")
+	_eq(_cold_hit(Catalog.Source.BUMPER), 30, "Gold Lv2 triples it")
+	Run.current_ball = Catalog.VANILLA
+	_eq(_cold_hit(Catalog.Source.BUMPER), 10, "and does nothing when it is not in play")
+
+	# Ember builds fever faster.
+	Run.new_run(1063)
+	Run.current_ball = "ember"
+	Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.fever, 1.5, "Ember doubles the fever step")
+
+	# Heavy changes the geometry, and only Heavy does.
+	Run.new_run(1064)
+	_eq(Run.ball_radius_scale(), 1.0, "a normal ball is normal-sized")
+	Run.current_ball = "heavy"
+	_check(Run.ball_radius_scale() > 1.5, "Heavy is bigger")
+	_check(TableLayout.BALL_RADIUS * 2.0 * Run.ball_radius_scale() > TableLayout.OUTLANE_WIDTH,
+		"and too big for an outlane, which is the point")
+
+	# Ghost survives drains, one per level.
+	Run.new_run(1065)
+	Run.ball_queue = ["ghost"]
+	Run.take_next_ball()
+	var had := Run.balls_left
+	_check(Run.consume_ball(false), "Ghost survives a drain")
+	_eq(Run.balls_left, had, "at no cost")
+	_check(not Run.consume_ball(false), "but only once at level 1")
+
+	# Lucky turns score into money.
+	Run.new_run(1066)
+	Run.ball_queue = ["lucky"]
+	Run.take_next_ball()
+	Run.tokens = 0
+	Run.register_hit(Catalog.Source.ORBIT, 5)  # 100 * 5 = 500
+	_eq(Run.tokens, 1, "Lucky pays $1 per 500")
+
+	# An upgraded ball sells for a share of everything sunk into it, and selling
+	# the last copy takes the level with it.
+	Run.new_run(1069)
+	Run.add_ball("gold")
+	Run.add_ball("gold")
+	Run.upgrade_ball("gold")
+	_eq(Catalog.ball_sell_price("gold", 2),
+		int(floor((7 + Catalog.ball_upgrade_cost(1)) * Catalog.SELL_FRACTION)),
+		"the upgrade counts towards the sale")
+	Run.sell_ball(0)
+	_eq(Run.ball_level("gold"), 2, "a second copy keeps the level")
+	Run.sell_ball(1)
+	_eq(Run.ball_level("gold"), 1, "selling the last copy resets it")
+	Run.add_ball("gold")
+	_eq(Run.ball_level("gold"), 1, "so a rebought ball is not secretly upgraded")
+
+	# You cannot upgrade a ball you do not own.
+	Run.new_run(1067)
+	_check(not Run.can_take({"kind": "ball_upgrade", "id": "gold", "cost": 5}),
+		"upgrading an unowned ball is refused")
+	Run.add_ball("gold")
+	_check(Run.can_take({"kind": "ball_upgrade", "id": "gold", "cost": 5}),
+		"but allowed once it is owned")
+
+	# Balls have to actually reach the shelf, and an upgrade must never be
+	# offered for a ball that is not in the rack.
+	Run.new_run(1070)
+	var kinds := {}
+	for i in 200:
+		for offer in Run.roll_shop():
+			kinds[str(offer["kind"])] = true
+			if str(offer["kind"]) == "ball_upgrade":
+				_check(Run.ball_slots.has(str(offer["id"])),
+					"an upgrade is only offered for a ball in the rack")
+	_check(kinds.has("ball"), "balls are offered")
+	Run.add_ball("ember")
+	var saw_upgrade := false
+	for i in 200:
+		for offer in Run.roll_shop():
+			if str(offer["kind"]) == "ball_upgrade":
+				saw_upgrade = true
+	_check(saw_upgrade, "and upgrades once one is owned")
+
+	# A full rack refuses another ball.
+	Run.new_run(1068)
+	for i in Run.BALL_SLOTS:
+		Run.add_ball("ember")
+	_check(not Run.can_take({"kind": "ball", "id": "gold", "cost": 7}),
+		"a full rack cannot take another ball")

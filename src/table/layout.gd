@@ -74,9 +74,16 @@ const GATE_HOLD := 0.6
 ## lane at all. The ball rose a little, fell back, and sat there until the
 ## player plunged again, which reads as a broken game rather than a bad shot.
 ##
-## So the minimum clears the arch with margin, and the charge controls *where*
-## the ball ends up rather than *whether* it gets there.
-const PLUNGE_MIN_SPEED := 540.0
+## 540 was the second version of that same mistake. It does clear the divider,
+## so the ball technically leaves the lane -- but a sweep of launch speeds shows
+## it cresting the arch entrance and falling straight back down the right side
+## without ever crossing into the playfield: at 520-560 the ball gets no further
+## left than x~230, and from 580 up it reaches x~40-160 every time. A tap, which
+## is the first thing anyone does with a plunger, was a guaranteed dead ball.
+##
+## So the minimum sits above that measured threshold with margin, and the charge
+## controls *where* the ball ends up rather than *whether* it gets there.
+const PLUNGE_MIN_SPEED := 600.0
 const PLUNGE_MAX_SPEED := 760.0
 
 # --- Flippers -----------------------------------------------------------------

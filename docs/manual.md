@@ -194,6 +194,38 @@ its timer rather than stacking the effect.
 
 ---
 
+## Balls
+
+Five **ball slots**, every one holding a Vanilla ball when a run starts. Buying
+a ball fills the first Vanilla slot; selling one puts that slot back to Vanilla.
+You may own several of the same ball, and usually should — the slots set a
+*ratio*, not a collection.
+
+At the start of each stage the queue is drawn from the slots, one independent
+draw per ball you get to play, so three Golds in five slots means a 60% chance
+per ball rather than one guaranteed Gold. The right-hand panel shows the queue —
+the ball in play, then everything behind it — before you plunge.
+
+<!-- BEGIN GENERATED: balls -->
+| Ball | Effect | Buy | Sell |
+| --- | --- | --- | --- |
+| Ember Ball | Fever builds twice as fast | $6 | $4 |
+| Heavy Ball | Larger: fits no outlane, drains less | $6 | $4 |
+| Lucky Ball | Pays $1 per 500 points scored | $6 | $4 |
+| Gold Ball | Hits score x2 | $7 | $5 |
+| Ghost Ball | Survives its first drain | $8 | $6 |
+| Vanilla | No bonus | - | - |
+<!-- END GENERATED: balls -->
+
+**Upgrades** scale what a ball already does instead of adding a second effect:
+Gold Lv2 scores ×3, Ghost Lv2 survives two drains. A ball can only be upgraded
+while you own one, and each level costs more than the last.
+
+Only the ball currently in play applies its effect. Owning a Gold ball does
+nothing on the stages where you draw a Vanilla.
+
+---
+
 ## Table mods
 
 Permanent changes to the physical playfield — the one modifier layer that alters
@@ -239,6 +271,8 @@ entirely on one axis meets a wall.
 | Consumable slots | 3 |
 | Consumables per slot | 5 |
 | Balls per stage | 3 |
+| Ball slots | 5 |
+| Ball upgrade | $5, +$2 per level owned |
 | Nudges held | 2 |
 | Nudge recharge | 5s each |
 | Payout multiplier cap | x5 |

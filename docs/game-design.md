@@ -225,7 +225,7 @@ survives the "play all the balls" rule because what it counts is the balls you
 did not *need*, recorded at the moment the target fell — not the balls left
 over, which is now always zero.
 
-## The build — five layers of modifier
+## The build — six layers of modifier
 
 Balatro works because its categories are not five flavours of the same thing.
 Jokers bend **rules**, planets raise the **scoring table**, tarots edit the
@@ -244,6 +244,7 @@ So:
 | **Coils** | The flippers | *How long do I keep the ball alive?* |
 | **Consumables** | One stage | *What does **this** stage need?* |
 | **Table mods** | The playfield | *What does the machine look like?* |
+| **Balls** | The ball itself | *What am I playing **with**?* |
 
 The load-bearing split is the last two columns against the first two. Trinkets and
 levels make a good ball **worth more**. coils and consumables make good balls
@@ -283,6 +284,48 @@ build. They hook a small set of events: `on_hit`, `on_score`, `on_ball_start`,
 `Deadhead` is the deliberate build-breaker, the way Balatro keeps one joker that
 invalidates a core rule. It converts the game from "three separate attempts" to
 "one long accumulating attempt", and it should be rare and expensive.
+
+### Ball types
+
+Five **ball slots**, all holding a Vanilla ball at the start of a run. Buying a
+ball fills the first Vanilla slot; selling one empties that slot back to
+Vanilla. Duplicates are allowed and are the point — the slots are a *ratio*, not
+a collection.
+
+At the start of every stage the queue is drawn from the slots, one independent
+draw per ball you get to play. Three Golds in five slots is not "you own a Gold
+ball", it is a 60% chance per ball, and the right-hand panel shows the resulting
+queue — the ball in play and everything behind it — before you plunge.
+
+| Ball | Effect |
+| --- | --- |
+| Vanilla | Nothing. Also the empty slot. |
+| Ember | Fever builds twice as fast |
+| Heavy | Larger: too wide for an outlane |
+| Lucky | Pays $1 per 500 points scored |
+| Gold | Hits score ×2 |
+| Ghost | Survives its first drain |
+
+Levels scale what a ball already does rather than bolting on a second effect —
+Gold Lv2 is ×3, Ghost Lv2 survives twice — so an upgrade never needs reading
+twice. Upgrades cost $5 and rise by $2 per level already owned, and can only be
+bought for a ball you actually have in a slot.
+
+This is the one layer whose payoff is **random by design**. Every other category
+is a guarantee you bought; balls are a distribution you shaped. That is what
+makes the fifth Gold worth buying when you already own four, and it is why the
+queue is visible: a stage where you drew three Ghosts is a stage you play
+differently, and you should get to know that at the plunger rather than at the
+drain.
+
+Two of them are physical rather than arithmetic, which is the part a card game
+cannot copy. **Heavy** is simply too wide to fit down an 11px outlane — it is
+not a reduced drain chance, it is a geometric impossibility, and you can watch
+it refuse to fit. **Ghost** is the same idea pointed at the drain line. Heavy
+was tried first as a consumable and had to be withdrawn: resizing a ball in
+mid-flight can wedge it inside a lane it was already halfway down. Fixed at
+spawn it is safe, which is the general rule — *ball* effects may change
+geometry, *stage* effects may not.
 
 ### Table mods (vouchers)
 
@@ -521,6 +564,12 @@ starting point that is not a guess.
   launched by the flipper's actual motion rather than by a scripted impulse.
 - Restitution is low on walls (0.25) and high on rubbers (0.75), which is what
   makes slingshots and bumpers read as *live* against a dead outer wall.
+- The plunge floor (**600 px/s**) is a correctness number, not a taste one, and
+  has been set too low twice. Escaping the lane needs ~464 px/s and *reaching
+  the playfield* needs ~580: between those two figures the ball crests the arch
+  entrance and falls straight back down the right-hand side having touched
+  nothing. A tap is the first thing anyone does with a plunger, so the weakest
+  plunge has to be a real shot. `inlane_test` now holds the line.
 
 ## Look and sound
 

@@ -12,6 +12,7 @@ signal score_changed
 signal mult_changed
 signal trinkets_changed
 signal consumables_changed
+signal balls_changed
 signal tokens_changed
 signal stage_changed
 signal nudges_changed
@@ -27,6 +28,11 @@ const MAX_CONSUMABLES := 3
 ## and a cap keeps the readout single-digit and hoarding bounded. Purely a
 ## balance number -- nothing breaks if it moves.
 const MAX_STACK := 5
+## Five slots, all Vanilla to begin with. The slots are simultaneously the
+## inventory and the draw weights, which is what keeps the odds readable: two
+## Gold in five slots is plainly a 2-in-5 chance, in a way that a separate
+## weight table never would be.
+const BALL_SLOTS := 5
 const BASE_BALLS := 3
 const MAX_NUDGES := 2
 const NUDGE_RECHARGE := 5.0  # seconds per nudge
@@ -70,6 +76,15 @@ var consumables: Array[String] = ["", "", ""]
 ## address. Kept honest by going through the helpers below rather than by being
 ## touched directly.
 var consumable_stacks: Array[int] = [0, 0, 0]
+var ball_slots: Array[String] = []
+var ball_levels := {}  ## ball id -> level, absent means 1
+
+## The balls this stage will serve, drawn at the start of it and shown to the
+## player. Drawn up front rather than per serve so a bad draw is a roll you can
+## see and plan around, instead of the machine appearing to cheat at the moment
+## it matters.
+var ball_queue: Array[String] = []
+var current_ball := Catalog.VANILLA
 var mods: Array[String] = []
 var levels := {}  ## Catalog.Source -> int, absent means level 1
 var rng := RandomNumberGenerator.new()
@@ -112,6 +127,8 @@ var _fever_expires := 0.0
 var _hits_since_jackpot := 0
 var _hits_since_reset := 0
 var _penny_progress := 0
+var _lucky_progress := 0
+var _ghost_saves := 0
 
 
 func _ready() -> void:
@@ -151,11 +168,18 @@ func new_run(with_seed: int = 0) -> void:
 	tokens = 4
 	trinkets.clear()
 	_clear_consumables()
+	ball_slots.clear()
+	for i in BALL_SLOTS:
+		ball_slots.append(Catalog.VANILLA)
+	ball_levels.clear()
+	ball_queue.clear()
+	current_ball = Catalog.VANILLA
 	mods.clear()
 	levels.clear()
 	begin_stage()
 	trinkets_changed.emit()
 	consumables_changed.emit()
+	balls_changed.emit()
 	tokens_changed.emit()
 
 
@@ -174,9 +198,58 @@ func begin_stage() -> void:
 		boss_id = str(Catalog.BOSSES[rng.randi() % Catalog.BOSSES.size()]["id"])
 		if boss_id == "short_ball":
 			balls_left = maxi(1, balls_left - 1)
+	roll_ball_queue()
 	begin_ball()
 	stage_changed.emit()
 	score_changed.emit()
+
+
+## Draws this stage's balls from the slot ratio.
+##
+## One draw per ball, independent, so five slots of Vanilla and one Gold is a
+## 1-in-5 chance *each time* rather than a guarantee of exactly one Gold. That
+## is the honest reading of "based on the ratio", and it is what makes a second
+## Gold worth buying.
+func roll_ball_queue() -> void:
+	ball_queue.clear()
+	for i in balls_for_stage():
+		ball_queue.append(ball_slots[rng.randi() % ball_slots.size()])
+	# Nothing is in play until one is served. Leaving the previous stage's ball
+	# sitting in `current_ball` would show the player a ball they no longer have
+	# at the head of a queue they have not started.
+	current_ball = ""
+	balls_changed.emit()
+
+
+## Takes the next ball off the queue. Falls back to Vanilla rather than failing:
+## a relic that conjures an extra ball can outrun the queue, and an extra ball
+## with no bonus is a much better outcome than no ball at all.
+func take_next_ball() -> String:
+	current_ball = ball_queue.pop_front() if not ball_queue.is_empty() else Catalog.VANILLA
+	# Per-ball charges are refreshed *here*, when a ball is physically served,
+	# and deliberately not in begin_ball(). A Ghost save calls begin_ball() to
+	# reset the MULT -- refreshing there let the same ball re-earn its own save
+	# every time it used one, which is an infinite ball.
+	_ghost_saves = ball_level("ghost") if current_ball == "ghost" else 0
+	_lucky_progress = 0
+	balls_changed.emit()
+	return current_ball
+
+
+func ball_level(id: String) -> int:
+	return int(ball_levels.get(id, 1))
+
+
+## Whether a ball has actually been served. False between stages and between
+## the roll and the plunge, when the queue exists but nothing is on the table.
+func ball_in_play() -> bool:
+	return current_ball != ""
+
+
+## How much of `id`'s effect is in play right now: zero unless it is the ball on
+## the table, and scaled by its level when it is.
+func ball_power(id: String) -> float:
+	return float(ball_level(id)) if current_ball == id else 0.0
 
 
 func begin_ball() -> void:
@@ -205,6 +278,11 @@ func begin_ball() -> void:
 func consume_ball(via_outlane: bool) -> bool:
 	if via_outlane and has_trinket("outlane_insurance"):
 		_grant_tokens(3, "Outlane Insurance +$3")
+	if current_ball == "ghost" and _ghost_saves > 0:
+		_ghost_saves -= 1
+		toast.emit("GHOST BALL")
+		begin_ball()
+		return true
 	if effect_active("second_wind") and not _second_wind_used:
 		_second_wind_used = true
 		toast.emit("SECOND WIND")
@@ -340,6 +418,10 @@ func register_hit(source: int, count: int = 1) -> int:
 		value *= 2.0
 	if effect_active("ball_polish"):
 		value *= 2.0
+	if current_ball == "gold":
+		# x2 at level 1, x3 at level 2, and so on: an upgrade is always "more of
+		# what this ball already did".
+		value *= 1.0 + ball_power("gold")
 
 	# --- per-hit trinket and boss hooks ---
 	var now := float(Time.get_ticks_msec()) / 1000.0
@@ -386,6 +468,8 @@ func register_hit(source: int, count: int = 1) -> int:
 ## more than the player can read.
 func _stoke_fever() -> void:
 	var step := FEVER_STEP * (2.0 if has_trinket("combo_coil") else 1.0)
+	if current_ball == "ember":
+		step *= 1.0 + ball_power("ember")
 	fever = minf(FEVER_MAX, fever + step)
 	_fever_expires = float(Time.get_ticks_msec()) + FEVER_WINDOW * 1000.0
 	fever_changed.emit()
@@ -403,6 +487,13 @@ func _bank(points: int) -> void:
 		_penny_progress += points
 		while _penny_progress >= 1000:
 			_penny_progress -= 1000
+			tokens += 1
+			tokens_changed.emit()
+	if current_ball == "lucky":
+		_lucky_progress += points
+		var per := maxi(100, 500 - 100 * (ball_level("lucky") - 1))
+		while _lucky_progress >= per:
+			_lucky_progress -= per
 			tokens += 1
 			tokens_changed.emit()
 	score_changed.emit()
@@ -464,6 +555,21 @@ func try_nudge() -> int:
 ## through the 18px drain gap, and no longer fits down an 11px outlane or a
 ## 22px orbit either. It protects and locks out in the same stroke, and nobody
 ## had to write a rule saying so.
+## How big the ball on the table is.
+##
+## This is the one modifier that changes the *geometry* of play, and it only
+## works because the type is fixed when the ball is served. Growing a ball
+## mid-flight wedges it inside an 11px outlane -- which is exactly why Heavy
+## Ball failed as a consumable and works as a ball.
+##
+## At 1.75x it no longer fits an outlane at all, which is most of its value, and
+## still clears the 18px drain gap, which is what stops it being a free win.
+func ball_radius_scale() -> float:
+	if current_ball != "heavy":
+		return 1.0
+	return 1.75 + 0.15 * float(ball_level("heavy") - 1)
+
+
 func effect_active(id: String) -> bool:
 	return effects.has(id)
 
@@ -621,6 +727,45 @@ func sell(kind: String, index: int) -> int:
 	return price
 
 
+## Buying a ball fills the first Vanilla slot -- Vanilla *is* the empty slot.
+func add_ball(id: String) -> bool:
+	var slot := ball_slots.find(Catalog.VANILLA)
+	if slot < 0:
+		return false
+	ball_slots[slot] = id
+	balls_changed.emit()
+	return true
+
+
+## Selling turns the slot back into Vanilla rather than removing it: there are
+## always exactly five, because five is what the odds are computed against.
+func sell_ball(index: int) -> int:
+	if index < 0 or index >= ball_slots.size():
+		return 0
+	var id: String = ball_slots[index]
+	if id == Catalog.VANILLA:
+		return 0
+	# Priced on everything sunk into it, upgrades included -- selling a Gold Lv3
+	# for the price of a plain Gold would make an upgrade a thing you can only
+	# ever throw away.
+	var price := Catalog.ball_sell_price(id, ball_level(id))
+	ball_slots[index] = Catalog.VANILLA
+	# The level belongs to the balls in the rack, not to the run's memory of
+	# them. Kept past the last copy, it would come back free with the next one
+	# you bought -- sell low, rebuy cheap, keep the levels.
+	if not ball_slots.has(id):
+		ball_levels.erase(id)
+	tokens += price
+	tokens_changed.emit()
+	balls_changed.emit()
+	return price
+
+
+func upgrade_ball(id: String) -> void:
+	ball_levels[id] = ball_level(id) + 1
+	balls_changed.emit()
+
+
 ## Whether there is room for what an offer would give you. Checked by the shop
 ## so a full inventory greys the button out rather than taking the money.
 func can_take(offer: Dictionary) -> bool:
@@ -629,6 +774,11 @@ func can_take(offer: Dictionary) -> bool:
 			return trinkets.size() < MAX_TRINKETS and not has_trinket(str(offer["id"]))
 		"consumable":
 			return consumables.has("") or _stackable_slot(str(offer["id"])) >= 0
+		"ball":
+			return ball_slots.has(Catalog.VANILLA)
+		"ball_upgrade":
+			# Upgrading a ball you do not own would be buying nothing.
+			return ball_slots.has(str(offer["id"]))
 	return true
 
 
@@ -685,19 +835,43 @@ func roll_shop(count: int = 4) -> Array:
 		if not has_mod(id):
 			mod_pool.append(id)
 	var consumable_pool: Array = Catalog.CONSUMABLES.keys()
+	var ball_pool: Array = []
+	for id in Catalog.BALLS:
+		if id != Catalog.VANILLA:
+			ball_pool.append(id)
+	# Only offer to upgrade a ball actually owned; upgrading one you do not have
+	# is buying nothing.
+	var upgrade_pool: Array = []
+	for id in ball_slots:
+		if id != Catalog.VANILLA and not upgrade_pool.has(id):
+			upgrade_pool.append(id)
 
 	for i in count:
 		var roll := rng.randf()
-		if roll < 0.45 and not trinket_pool.is_empty():
+		if roll < 0.14 and not ball_pool.is_empty() and ball_slots.has(Catalog.VANILLA):
+			var id: String = ball_pool[rng.randi() % ball_pool.size()]
+			offers.append(_offer("ball", id, Catalog.BALLS[id]))
+			continue
+		if roll < 0.22 and not upgrade_pool.is_empty():
+			var id: String = upgrade_pool[rng.randi() % upgrade_pool.size()]
+			var lvl := ball_level(id)
+			offers.append({
+				"kind": "ball_upgrade", "id": id,
+				"name": "%s Lv%d" % [Catalog.BALLS[id]["name"], lvl + 1],
+				"desc": "Stronger: %s" % str(Catalog.BALLS[id]["desc"]).to_lower(),
+				"cost": Catalog.ball_upgrade_cost(lvl),
+			})
+			continue
+		if roll < 0.55 and not trinket_pool.is_empty():
 			var id: String = trinket_pool[rng.randi() % trinket_pool.size()]
 			trinket_pool.erase(id)
 			offers.append(_offer("trinket", id, Catalog.TRINKETS[id]))
-		elif roll < 0.72 and not consumable_pool.is_empty():
+		elif roll < 0.80 and not consumable_pool.is_empty():
 			# Not erased from the pool: two of the same consumable on one shelf
 			# is fine, because holding two of them is fine.
 			var id: String = consumable_pool[rng.randi() % consumable_pool.size()]
 			offers.append(_offer("consumable", id, Catalog.CONSUMABLES[id]))
-		elif roll < 0.82 and not mod_pool.is_empty():
+		elif roll < 0.88 and not mod_pool.is_empty():
 			var id: String = mod_pool[rng.randi() % mod_pool.size()]
 			mod_pool.erase(id)
 			offers.append(_offer("mod", id, Catalog.MODS[id]))
@@ -734,6 +908,10 @@ func buy(offer: Dictionary) -> bool:
 			add_trinket(str(offer["id"]))
 		"consumable":
 			add_consumable(str(offer["id"]))
+		"ball":
+			add_ball(str(offer["id"]))
+		"ball_upgrade":
+			upgrade_ball(str(offer["id"]))
 		"mod":
 			add_mod(str(offer["id"]))
 		"level":

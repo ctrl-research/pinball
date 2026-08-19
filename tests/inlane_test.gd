@@ -21,6 +21,7 @@ var _frames := 0
 var _ball: Ball
 var _reached_flipper := false
 var _went_outlane := false
+var _min_x := INF
 
 
 func _ready() -> void:
@@ -66,6 +67,17 @@ func _ready() -> void:
 			"at": Vector2(14, 250), "want_outlane": true, "wormhole": true,
 			"box": Rect2(130, 282, 44, 42),
 		},
+		# The weakest plunge has to be a real shot. Twice now the floor has been
+		# set to a speed that merely gets the ball out of the lane, which is a
+		# lower bar than getting it onto the playfield: the ball crests the arch
+		# entrance and falls straight back down the right-hand side, having
+		# touched nothing. A tap is the first thing anyone tries, so the floor
+		# is a correctness property, not a taste one.
+		{
+			"name": "the weakest plunge reaches the playfield",
+			"at": TableLayout.BALL_REST, "plunge": true, "frames": 480,
+			"reach_x": 200.0, "want_outlane": false, "box": Rect2(0, 0, 0, 0),
+		},
 	]
 	_next_case()
 
@@ -75,6 +87,7 @@ func _next_case() -> void:
 	_frames = 0
 	_reached_flipper = false
 	_went_outlane = false
+	_min_x = INF
 	if _index >= _cases.size():
 		_finish()
 		return
@@ -86,6 +99,9 @@ func _next_case() -> void:
 	if bool(_cases[_index].get("wormhole", false)):
 		Run.effects["wormhole"] = Time.get_ticks_msec() + 60_000
 	_ball = _table.spawn_ball_at(_cases[_index]["at"])
+	if bool(_cases[_index].get("plunge", false)):
+		_ball.linear_velocity = Vector2(0.0, -TableLayout.PLUNGE_MIN_SPEED)
+		_ball.in_plunger_lane = false
 
 
 func _physics_process(_delta: float) -> void:
@@ -99,11 +115,20 @@ func _physics_process(_delta: float) -> void:
 			_reached_flipper = true
 		if bool(_ball.get_meta("via_outlane", false)):
 			_went_outlane = true
+		_min_x = minf(_min_x, _ball.position.x)
 
-	if _frames < SETTLE_FRAMES:
+	if _frames < int(case.get("frames", SETTLE_FRAMES)):
 		return
 
-	if bool(case.get("wormhole", false)):
+	if bool(case.get("plunge", false)):
+		# Only how far left it got matters: a ball that never crosses into the
+		# playfield cannot hit anything, however long it stays alive.
+		if _min_x > float(case["reach_x"]):
+			_fail("%s -- got no further than x=%.0f, so it never left the lane side"
+				% [case["name"], _min_x])
+		else:
+			print("  ok: %s (reached x=%.0f)" % [case["name"], _min_x])
+	elif bool(case.get("wormhole", false)):
 		# Survival is the whole point here, not routing.
 		var alive := is_instance_valid(_ball) and _table.balls.has(_ball)
 		if not alive:

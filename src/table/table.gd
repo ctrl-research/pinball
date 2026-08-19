@@ -337,6 +337,9 @@ func serve_ball() -> void:
 		t.reset_target()
 	for r in _rollovers:
 		r.unlight()
+	# The type is decided here, before the body exists, which is what makes a
+	# ball's size safe to vary at all.
+	Run.take_next_ball()
 	_add_ball(TableLayout.BALL_REST, true)
 
 
