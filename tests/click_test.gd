@@ -31,6 +31,7 @@ func _ready() -> void:
 
 	await _test_buy()
 	await _test_sell()
+	await _test_on_screen()
 	_finish()
 
 
@@ -83,6 +84,60 @@ func _test_sell() -> void:
 			% [before, Run.tokens])
 	else:
 		print("  ok: a click on the inventory sells the item")
+
+
+## Every overlay must fit on the screen, checked at its worst case: a full rack
+## of trinkets, consumables and balls, which is thirteen inventory rows on top
+## of the offers.
+##
+## This is here because raising the text scale pushed the shop's NEXT BLIND
+## button clean off the bottom of the screen. The keyboard still worked, so the
+## sim sailed through it and the buy/sell checks above passed too -- the button
+## was simply not reachable by mouse, which is an unfinishable run for anyone
+## playing with one.
+func _test_on_screen() -> void:
+	Run.trinkets.clear()
+	Run.trinkets.assign(["deadhead", "combo_coil", "jackpot_lamp", "penny_slot",
+		"outlane_insurance"])
+	Run._clear_consumables()
+	for id in ["surge", "slow_ball", "wormhole"]:
+		Run.add_consumable(id)
+	for i in Run.BALL_SLOTS:
+		Run.ball_slots[i] = "gold"
+
+	var screen := Rect2(Vector2.ZERO, Vector2(TextScreen.RESOLUTION))
+	var screens := {
+		"shop": func() -> void: _game._enter_shop(),
+		"intro": func() -> void: _game.hud.show_intro(),
+		"cleared": func() -> void: _game.hud.show_cleared(Run.stage_payout()),
+		"defeat": func() -> void: _game.hud.show_lost(),
+		"victory": func() -> void: _game.hud.show_won(),
+	}
+	for name in screens:
+		(screens[name] as Callable).call()
+		await _settle()
+		var button := _last_button(_game.hud)
+		if button == null:
+			_fail("%s has no button to continue with" % name)
+			continue
+		var rect := button.get_global_rect()
+		if not screen.encloses(rect):
+			_fail("%s: its %s button is at %s, outside the %s screen"
+				% [name, button.text, rect, screen.size])
+		else:
+			print("  ok: %s fits on screen" % name)
+
+
+## The continue button is the last one built on every screen.
+func _last_button(node: Node) -> Button:
+	var found: Button = null
+	for child in node.get_children():
+		if child is Button and (child as Button).is_visible_in_tree():
+			found = child
+		var deeper := _last_button(child)
+		if deeper != null:
+			found = deeper
+	return found
 
 
 ## The UI is laid out in the text screen's 640x360 space, while a real click

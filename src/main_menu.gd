@@ -29,26 +29,29 @@ func _ready() -> void:
 	_type = TextScreen.new()
 	add_child(_type)
 
-	_text("TILT", Vector2(0, 62), 56, GOLD)
-	_text("a pinball roguelike", Vector2(0, 126), 16, INK)
+	# Spaced for the scaled type. The title is set a size smaller than it reads
+	# because Style.TEXT_SCALE multiplies it too, and at the old 56 it grew into
+	# the subtitle beneath it.
+	_text("TILT", Vector2(0, 34), 46, GOLD)
+	_text("a pinball roguelike", Vector2(0, 112), 14, INK)
 	_text("Beat the score with the balls you are given.\n"
 		+ "Bolt something onto the machine. Do it again, harder.",
-		Vector2(0, 156), 8, DIM)
+		Vector2(0, 143), 8, DIM)
 
 	var play := Button.new()
 	play.text = "PLAY"
-	play.position = Vector2(270, 214)
-	play.size = Vector2(100, 28)
-	play.add_theme_font_size_override("font_size", 16)
+	play.position = Vector2(255, 194)
+	play.size = Vector2(130, 32)
+	play.add_theme_font_size_override("font_size", Style.pt(14))
 	play.pressed.connect(_play)
 	_type.host().add_child(play)
 
-	_text("seed (optional)", Vector2(0, 258), 8, DIM)
+	_text("seed (optional)", Vector2(0, 240), 8, DIM)
 	_seed_field = LineEdit.new()
-	_seed_field.position = Vector2(270, 272)
-	_seed_field.size = Vector2(100, 20)
+	_seed_field.position = Vector2(255, 256)
+	_seed_field.size = Vector2(130, 24)
 	_seed_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_seed_field.add_theme_font_size_override("font_size", 8)
+	_seed_field.add_theme_font_size_override("font_size", Style.pt(8))
 	# Deliberately not in the text screen. Typing into a field inside a nested
 	# viewport means its focus and its caret live in a different input context
 	# from the rest of the menu, which is a lot of risk to accept for a wobble
@@ -56,8 +59,8 @@ func _ready() -> void:
 	add_child(_seed_field)
 
 	_text("A / D or arrows flip   SPACE plunges   Q / W / E nudge",
-		Vector2(0, 316), 8, DIM)
-	_text("Nudge too often and the machine tilts.", Vector2(0, 332), 8, DIM)
+		Vector2(0, 300), 8, DIM)
+	_text("Nudge too often and the machine tilts.", Vector2(0, 322), 8, DIM)
 
 	play.grab_focus()
 
@@ -87,7 +90,7 @@ func _text(content: String, pos: Vector2, size: int, colour: Color) -> Label:
 	l.position = Vector2(0, pos.y)
 	l.size = Vector2(640, float(size) * 3.0)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", Style.pt(size))
 	l.add_theme_color_override("font_color", colour)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_type.host().add_child(l)

@@ -18,9 +18,27 @@ signal confirmed
 signal bought(index: int)
 signal sold(kind: String, index: int)
 
-const SLOT_H := 26.0
-const CONSUMABLE_H := 20.0
+## Inventory cells are sized from the type they hold rather than pinned to a
+## pixel count, so raising Style.TEXT_SCALE reflows the panel instead of
+## overlapping it. Trinket names get one line and clip: at the larger size a
+## wrapped second line costs more room than the tail of "Outlane Insurance" is
+## worth.
 const SLOT_GAP := 3.0
+const SLOT_PAD := 5.0
+
+
+static func slot_h() -> float:
+	return float(Style.pt(8)) + SLOT_PAD * 2.0
+
+
+static func consumable_h() -> float:
+	return float(Style.pt(8)) + SLOT_PAD * 2.0
+
+
+## One line of a given design size, plus leading. What the panel cursor advances
+## by.
+static func lh(design_size: int, leading: float = 3.0) -> float:
+	return float(Style.pt(design_size)) + leading
 
 const INK := Color(0.86, 0.88, 0.96)
 const DIM := Color(0.46, 0.48, 0.62)
@@ -185,29 +203,32 @@ func _build_left() -> void:
 	var w := p.size.x - 8.0
 
 	_label("TRINKETS", Vector2(x, p.position.y + 6.0), w, 8, DIM)
-	var y := p.position.y + 18.0
+	var y := p.position.y + lh(8) + 3.0
 	for i in Run.MAX_TRINKETS:
-		_slots.append(_slot(Vector2(x, y), w, SLOT_H))
-		y += SLOT_H + SLOT_GAP
+		_slots.append(_slot(Vector2(x, y), w, slot_h()))
+		y += slot_h() + SLOT_GAP
 
-	y += 6.0
+	y += 5.0
 	_label("CONSUMABLES", Vector2(x, y), w, 8, DIM)
-	y += 12.0
+	y += lh(8) + 2.0
 	for i in Run.MAX_CONSUMABLES:
-		_consumable_slots.append(_slot(Vector2(x, y), w, CONSUMABLE_H))
-		y += CONSUMABLE_H + SLOT_GAP
+		_consumable_slots.append(_slot(Vector2(x, y), w, consumable_h()))
+		y += consumable_h() + SLOT_GAP
 
-	y += 6.0
+	y += 5.0
 	_label("ACTIVE", Vector2(x, y), w, 8, DIM)
-	y += 10.0
+	y += lh(8)
 	for i in Run.MAX_CONSUMABLES:
 		_active_labels.append(_label("", Vector2(x, y), w, 8, Color(0.55, 0.90, 0.95)))
-		y += 10.0
+		y += lh(8, 1.0)
 
-	y += 6.0
-	_label("MULTIPLIER", Vector2(x, y), w, 8, DIM)
-	_mult = _label("x1", Vector2(x, y + 10.0), w, 20, GOLD)
-	_toast_label = _label("", Vector2(x, y + 36.0), w, 9, GOLD, true)
+	# Pinned to the bottom of the panel rather than following the cursor: MULT
+	# is the number the player looks for without reading, and it should not move
+	# because a consumable expired three rows above it.
+	var foot := p.position.y + p.size.y
+	_toast_label = _label("", Vector2(x, foot - lh(9) - 4.0), w, 9, GOLD, true)
+	_mult = _label("x1", Vector2(x, foot - lh(9) - lh(20) - 6.0), w, 20, GOLD)
+	_label("MULTIPLIER", Vector2(x, foot - lh(9) - lh(20) - lh(8) - 6.0), w, 8, DIM)
 
 
 ## One inventory cell: a tinted box with a wrapped label inside it.
@@ -225,7 +246,7 @@ func _slot(pos: Vector2, w: float, h: float) -> ColorRect:
 	text.custom_minimum_size = Vector2(w - 8.0, 0.0)
 	text.position = Vector2(4, 2)
 	text.size = Vector2(w - 8.0, h - 4.0)
-	text.add_theme_font_size_override("font_size", 8)
+	text.add_theme_font_size_override("font_size", Style.pt(8))
 	text.clip_text = true
 	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.add_child(text)
@@ -236,21 +257,30 @@ func _build_right() -> void:
 	var p := Cabinet.PANEL_RIGHT
 	var x := p.position.x + 4.0
 	var w := p.size.x - 8.0
+	# Laid out with a running cursor rather than hardcoded offsets. The panel is
+	# a fixed 348px tall and the type is now half again as large, so there is no
+	# slack left for a row that has quietly drifted onto the one below it.
+	var y := p.position.y + 5.0
 
-	_label("SCORE", Vector2(x, p.position.y + 6.0), w, 8, DIM)
-	_score = _label("0", Vector2(x, p.position.y + 16.0), w, 24, INK)
+	_label("SCORE", Vector2(x, y), w, 8, DIM)
+	y += lh(8)
+	_score = _label("0", Vector2(x, y), w, 20, INK)
+	y += lh(20) + 4.0
 
-	_label("TARGET", Vector2(x, p.position.y + 52.0), w, 8, DIM)
-	_target = _label("0", Vector2(x, p.position.y + 62.0), w, 14, INK)
+	_label("TARGET", Vector2(x, y), w, 8, DIM)
+	y += lh(8)
+	_target = _label("0", Vector2(x, y), w, 14, INK)
+	y += lh(14) + 4.0
 
 	# A bar as well as the numbers. "12,480 of 20,000" is arithmetic the player
 	# has to do mid-ball; a bar is the same fact at a glance.
 	var track := ColorRect.new()
-	track.position = Vector2(x, p.position.y + 84.0)
+	track.position = Vector2(x, y)
 	track.size = Vector2(w, 6.0)
 	track.color = Color(0.14, 0.14, 0.21)
 	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(track)
+	y += 12.0
 
 	_progress = ColorRect.new()
 	_progress.position = Vector2.ZERO
@@ -259,22 +289,32 @@ func _build_right() -> void:
 	_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	track.add_child(_progress)
 
-	_status = _label("", Vector2(x, p.position.y + 94.0), w, 9, GOLD)
-	_balls = _label("", Vector2(x, p.position.y + 108.0), w, 10, INK)
+	_status = _label("", Vector2(x, y), w, 9, GOLD)
+	y += lh(9) + 2.0
+	_balls = _label("", Vector2(x, y), w, 10, INK)
+	y += lh(10)
+
 	# Shown up front, because the balls are drawn from the slot ratio at the
 	# start of the stage. A roll you can see is a roll you can plan around; the
 	# same roll revealed one ball at a time reads as the machine cheating.
 	# Colour first, names second. The pip colours are the ball colours on the
 	# playfield, so the head of the queue is the thing the player is looking at.
 	_queue_pips = Control.new()
-	_queue_pips.position = Vector2(x, p.position.y + 122.0)
-	_queue_pips.size = Vector2(w, 12.0)
+	_queue_pips.position = Vector2(x, y)
+	_queue_pips.size = Vector2(w, PIP_RADIUS * 3.0)
 	_queue_pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_queue_pips.draw.connect(_draw_queue)
 	_root.add_child(_queue_pips)
-	_queue = _label("", Vector2(x, p.position.y + 136.0), w, 8, DIM, true)
-	_nudge = _label("", Vector2(x, p.position.y + 158.0), w, 10, INK)
-	_tokens = _label("", Vector2(x, p.position.y + 176.0), w, 14, GOLD)
+	y += PIP_RADIUS * 3.0
+
+	_queue = _label("", Vector2(x, y), w, 8, DIM, true)
+	# Room for the second line the queue wraps onto with a full rack.
+	y += lh(8, 1.0) * 2.0
+
+	_nudge = _label("", Vector2(x, y), w, 10, INK)
+	y += lh(10) + 3.0
+	_tokens = _label("", Vector2(x, y), w, 14, GOLD)
+	y += lh(14) + 4.0
 
 	# Fever lives here rather than beside MULT because this panel is the
 	# fast-moving one, and fever is the fastest number in the game -- it climbs
@@ -283,15 +323,18 @@ func _build_right() -> void:
 	# With five contacts to a level the number itself now sits still most of the
 	# time, and a meter that only moves once every five hits looks broken unless
 	# something shows the four hits in between.
-	_fever_head = _label("FEVER", Vector2(x, p.position.y + 200.0), w, 8, DIM)
-	_fever = _label("x1", Vector2(x, p.position.y + 210.0), w, 20, FEVER_COLOUR)
+	_fever_head = _label("FEVER", Vector2(x, y), w, 8, DIM)
+	y += lh(8)
+	_fever = _label("x1", Vector2(x, y), w, 18, FEVER_COLOUR)
+	y += lh(18) + 2.0
 
 	var fever_track := ColorRect.new()
-	fever_track.position = Vector2(x, p.position.y + 236.0)
+	fever_track.position = Vector2(x, y)
 	fever_track.size = Vector2(w, 4.0)
 	fever_track.color = Color(0.14, 0.14, 0.21)
 	fever_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(fever_track)
+	y += 12.0
 
 	# The bar is the *timer*, not the size of the multiplier: what the player
 	# needs to know mid-ball is how long they have left to keep it alive.
@@ -301,9 +344,17 @@ func _build_right() -> void:
 	_fever_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fever_track.add_child(_fever_bar)
 
-	_label("A / D  flippers\nSPACE  hold to plunge\nQ / W / E  nudge\n1 / 2 / 3  consumables\n\n"
-		+ "Nudge on empty and it tilts.",
-		Vector2(x, p.position.y + 270.0), w, 8, DIM, true)
+	# Anchored to the panel floor rather than left on the cursor. It is the last
+	# block, so it is the one that silently walks off the bottom of the panel
+	# when anything above it grows -- which is exactly what it did at 1.5x.
+	# Pinned here, a collision shows up as an overlap instead of as a row that
+	# is simply not there.
+	#
+	# It is also the block that gives up room when type grows: it is read once
+	# and then never again. The tilt warning it used to carry is on the title
+	# screen, which is where anyone actually reads it.
+	var keys := "A / D  flippers\nSPACE  plunge\nQ W E  nudge   1 2 3  items"
+	_label(keys, Vector2(x, p.position.y + p.size.y - lh(8) * 3.0 - 4.0), w, 8, DIM, true)
 
 
 ## `wrap` is applied before the size is set, and that order matters: a Label
@@ -319,7 +370,7 @@ func _label(text: String, pos: Vector2, width: float, size: int, colour: Color,
 	l.text = text
 	l.position = pos
 	l.size = Vector2(width, float(size) * 4.0)
-	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_font_size_override("font_size", Style.pt(size))
 	l.add_theme_color_override("font_color", colour)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(l)
@@ -340,20 +391,23 @@ func _build_overlay() -> void:
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay.add_child(dim)
 
+	# Nearly the whole screen. The overlay is the one place with genuinely
+	# variable content -- a shop with a full rack is thirteen inventory rows --
+	# and at the larger type there is no margin left to spend on decoration.
 	var box := VBoxContainer.new()
-	box.position = Vector2(60, 50)
-	box.size = Vector2(520, 260)
-	box.add_theme_constant_override("separation", 8)
+	box.position = Vector2(36, 14)
+	box.size = Vector2(568, 338)
+	box.add_theme_constant_override("separation", 4)
 	_overlay.add_child(box)
 
 	_overlay_title = Label.new()
-	_overlay_title.add_theme_font_size_override("font_size", 22)
+	_overlay_title.add_theme_font_size_override("font_size", Style.pt(17))
 	_overlay_title.add_theme_color_override("font_color", GOLD)
 	_overlay_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(_overlay_title)
 
 	_overlay_body = VBoxContainer.new()
-	_overlay_body.add_theme_constant_override("separation", 6)
+	_overlay_body.add_theme_constant_override("separation", 3)
 	box.add_child(_overlay_body)
 
 
@@ -513,46 +567,55 @@ func show_shop(offers: Array) -> void:
 	_refresh()
 	_open("SHOP     $%d" % Run.tokens, [])
 
+	# Three columns rather than two. The inventory is thirteen rows at a full
+	# rack -- five trinkets, three consumables, five balls -- and stacked in one
+	# column at the current type size that ran the NEXT BLIND button off the
+	# bottom of the screen. Splitting the rack in two spends the empty
+	# horizontal space instead of the vertical space there is none of.
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 16)
+	columns.add_theme_constant_override("separation", 10)
 	_overlay_body.add_child(columns)
 
-	var buy_col := VBoxContainer.new()
-	buy_col.custom_minimum_size = Vector2(300.0, 0.0)
-	buy_col.add_theme_constant_override("separation", 3)
+	var buy_col := _shop_column(232.0)
 	columns.add_child(buy_col)
 	buy_col.add_child(_head("FOR SALE"))
 	if offers.is_empty():
 		buy_col.add_child(_body_line("Sold out.", DIM))
 	for i in offers.size():
-		buy_col.add_child(_offer_row(offers[i], i, 292.0))
+		buy_col.add_child(_offer_row(offers[i], i, 228.0))
 
-	var own_col := VBoxContainer.new()
-	own_col.custom_minimum_size = Vector2(200.0, 0.0)
-	own_col.add_theme_constant_override("separation", 3)
-	columns.add_child(own_col)
-
-	own_col.add_child(_head("TRINKETS  %d/%d" % [Run.trinkets.size(), Run.MAX_TRINKETS]))
+	var held_col := _shop_column(156.0)
+	columns.add_child(held_col)
+	held_col.add_child(_head("TRINKETS  %d/%d" % [Run.trinkets.size(), Run.MAX_TRINKETS]))
 	if Run.trinkets.is_empty():
-		own_col.add_child(_body_line("none", DIM))
+		held_col.add_child(_body_line("none", DIM))
 	for i in Run.trinkets.size():
-		own_col.add_child(_sell_button("trinket", Run.trinkets[i], i))
+		held_col.add_child(_sell_button("trinket", Run.trinkets[i], i))
 
-	own_col.add_child(_head("CONSUMABLES  %d/%d"
+	held_col.add_child(_head("CONSUMABLES  %d/%d"
 		% [Run.consumable_count(), Run.MAX_CONSUMABLES]))
 	if Run.consumable_count() == 0:
-		own_col.add_child(_body_line("none", DIM))
+		held_col.add_child(_body_line("none", DIM))
 	for i in Run.consumables.size():
 		# Index, not position: slot 2 sells slot 2 even if slot 1 is a hole.
 		if Run.consumables[i] != "":
-			own_col.add_child(_sell_button("consumable", Run.consumables[i], i))
+			held_col.add_child(_sell_button("consumable", Run.consumables[i], i))
 
-	own_col.add_child(_head("BALLS  %d/%d" % [_owned_balls(), Run.BALL_SLOTS]))
+	var ball_col := _shop_column(156.0)
+	columns.add_child(ball_col)
+	ball_col.add_child(_head("BALLS  %d/%d" % [_owned_balls(), Run.BALL_SLOTS]))
 	for i in Run.ball_slots.size():
-		own_col.add_child(_ball_slot_row(i))
+		ball_col.add_child(_ball_slot_row(i))
 
 	_overlay_body.add_child(_body_line("Click to buy or sell.", DIM))
 	_add_continue("NEXT BLIND")
+
+
+func _shop_column(width: float) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.custom_minimum_size = Vector2(width, 0.0)
+	col.add_theme_constant_override("separation", 2)
+	return col
 
 
 func _owned_balls() -> int:
@@ -574,10 +637,10 @@ func _ball_slot_row(index: int) -> Control:
 		return l
 	var lvl := Run.ball_level(id)
 	var b := Button.new()
-	b.add_theme_font_size_override("font_size", 9)
+	b.add_theme_font_size_override("font_size", Style.pt(8))
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.clip_text = true
-	b.custom_minimum_size = Vector2(196.0, 0.0)
+	b.custom_minimum_size = Vector2(152.0, 0.0)
 	var name := str(def["name"])
 	if lvl > 1:
 		name += " Lv%d" % lvl
@@ -590,7 +653,7 @@ func _ball_slot_row(index: int) -> Control:
 func _head(text: String) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", 9)
+	l.add_theme_font_size_override("font_size", Style.pt(9))
 	l.add_theme_color_override("font_color", DIM)
 	return l
 
@@ -608,7 +671,7 @@ func _offer_row(offer: Dictionary, index: int, width: float) -> Control:
 
 	var cost := int(offer["cost"])
 	var b := Button.new()
-	b.add_theme_font_size_override("font_size", 10)
+	b.add_theme_font_size_override("font_size", Style.pt(9))
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.clip_text = true
 	b.custom_minimum_size = Vector2(width, 0.0)
@@ -629,7 +692,7 @@ func _offer_row(offer: Dictionary, index: int, width: float) -> Control:
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.custom_minimum_size = Vector2(width, 0.0)
 	desc.text = str(offer["desc"])
-	desc.add_theme_font_size_override("font_size", 8)
+	desc.add_theme_font_size_override("font_size", Style.pt(8))
 	desc.add_theme_color_override("font_color", DIM)
 	row.add_child(desc)
 	return row
@@ -638,10 +701,10 @@ func _offer_row(offer: Dictionary, index: int, width: float) -> Control:
 func _sell_button(kind: String, id: String, index: int) -> Button:
 	var def: Dictionary = Catalog.TRINKETS[id] if kind == "trinket" else Catalog.CONSUMABLES[id]
 	var b := Button.new()
-	b.add_theme_font_size_override("font_size", 9)
+	b.add_theme_font_size_override("font_size", Style.pt(8))
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.clip_text = true
-	b.custom_minimum_size = Vector2(196.0, 0.0)
+	b.custom_minimum_size = Vector2(152.0, 0.0)
 	var label := str(def["name"])
 	if kind == "consumable" and Run.consumable_stacks[index] > 1:
 		# Says "one" because a click sells one off the stack, not the lot.
@@ -711,7 +774,7 @@ func _add_summary() -> void:
 func _stat_label(text: String, colour: Color, align: int) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", 11)
+	l.add_theme_font_size_override("font_size", Style.pt(9))
 	l.add_theme_color_override("font_color", colour)
 	l.horizontal_alignment = align
 	l.custom_minimum_size = Vector2(150.0, 0.0)
@@ -736,8 +799,8 @@ func _open(title: String, lines: Array) -> void:
 func _continue_button(label: String) -> Button:
 	var b := Button.new()
 	b.text = label
-	b.add_theme_font_size_override("font_size", 12)
-	b.custom_minimum_size = Vector2(160.0, 26.0)
+	b.add_theme_font_size_override("font_size", Style.pt(11))
+	b.custom_minimum_size = Vector2(160.0, 24.0)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	b.pressed.connect(confirmed.emit)
 	return b
@@ -755,7 +818,7 @@ func _add_continue(label: String) -> void:
 func _body_line(text: String, colour: Color) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", 11)
+	l.add_theme_font_size_override("font_size", Style.pt(9))
 	l.add_theme_color_override("font_color", colour)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return l
@@ -784,8 +847,13 @@ static func _commas(n: int) -> String:
 
 
 static func _trim(v: float) -> String:
-	# x4 reads better than x4.0; x4.2 still needs its decimal.
-	return str(int(v)) if is_equal_approx(v, float(int(v))) else "%.1f" % v
+	# x4 reads better than x4.0. Two decimals rather than one because fever
+	# moves in quarters: at one decimal x1.25 printed as x1.2 and x1.75 as x1.8,
+	# so the readout disagreed with the arithmetic it was reporting.
+	if is_equal_approx(v, float(int(v))):
+		return str(int(v))
+	var text := "%.2f" % v
+	return text.trim_suffix("0")
 
 
 static func _pips(filled: int, total: int) -> String:

@@ -17,6 +17,26 @@ const FONT_PATH := "res://assets/fonts/Jersey25.ttf"
 ## crispest, so prefer them for new text.
 const DESIGN_GRID := 8
 
+## Every font size in the game is multiplied by this, so type scales from one
+## number rather than from fourteen call sites.
+##
+## The UI is drawn at a native 640x360 and upscaled nearest-neighbour, so a
+## glyph is made of real, visible pixels: an 8pt label is eight pixels tall and
+## each of those is four screen pixels in a 1280x720 window. That is the look --
+## but it also means the smallest labels had very few pixels to say a letter
+## with, and were paying for the pixelation rather than benefiting from it.
+##
+## Sizes are written unscaled everywhere. Read an `8` in the layout as "the
+## small size", not as a pixel count.
+const TEXT_SCALE := 1.5
+
+
+## A design size in scaled pixels. Rounded, because a fractional font size makes
+## Jersey 25 land off the pixel grid -- which drew an 8 as a B in the manual
+## once already.
+func pt(design_size: int) -> int:
+	return int(round(float(design_size) * TEXT_SCALE))
+
 ## Jersey 25 is the heavy member of its family, so "bold" is the file rather
 ## than a weight axis to ask for.
 ##
