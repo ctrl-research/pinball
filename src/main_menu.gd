@@ -22,16 +22,16 @@ func _ready() -> void:
 	add_child(bg)
 
 	_text("TILT", Vector2(0, 62), 56, GOLD)
-	_text("a pinball roguelike", Vector2(0, 128), 14, INK)
+	_text("a pinball roguelike", Vector2(0, 126), 16, INK)
 	_text("Beat the score with the balls you are given.\n"
 		+ "Bolt something onto the machine. Do it again, harder.",
-		Vector2(0, 156), 10, DIM)
+		Vector2(0, 156), 8, DIM)
 
 	var play := Button.new()
 	play.text = "PLAY"
 	play.position = Vector2(270, 214)
 	play.size = Vector2(100, 28)
-	play.add_theme_font_size_override("font_size", 14)
+	play.add_theme_font_size_override("font_size", 16)
 	play.pressed.connect(_play)
 	add_child(play)
 
@@ -40,12 +40,12 @@ func _ready() -> void:
 	_seed_field.position = Vector2(270, 272)
 	_seed_field.size = Vector2(100, 20)
 	_seed_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_seed_field.add_theme_font_size_override("font_size", 10)
+	_seed_field.add_theme_font_size_override("font_size", 8)
 	add_child(_seed_field)
 
 	_text("A / D or arrows flip   SPACE plunges   Q / W / E nudge",
-		Vector2(0, 316), 9, DIM)
-	_text("Nudge too often and the machine tilts.", Vector2(0, 332), 9, DIM)
+		Vector2(0, 316), 8, DIM)
+	_text("Nudge too often and the machine tilts.", Vector2(0, 332), 8, DIM)
 
 	play.grab_focus()
 

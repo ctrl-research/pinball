@@ -115,6 +115,7 @@ src/
 │   ├── layout.gd     # the machine, as numbers
 │   ├── table.gd      # builds it; plunger, nudge, drain, boss hazards
 │   ├── ball.gd  flipper.gd  bumper.gd  slingshot.gd  target.gd  sensor.gd
+├── autoload/style.gd # the project-wide pixel typeface, set on the theme
 ├── ui/
 │   ├── cabinet.gd            # rails, lockdown bar, backbox, screen layout
 │   ├── perspective.gdshader  # the trapezoid warp
