@@ -64,6 +64,7 @@ var _forced := false
 var _fired_consumable := false
 var _consumable_step := 0
 var _ended_in := -1
+var _peak_fever := 1.0
 
 
 func _ready() -> void:
@@ -95,6 +96,8 @@ func _process(_delta: float) -> void:
 		_ended_in = _game.state
 		_finish()
 		return
+
+	_peak_fever = maxf(_peak_fever, Run.fever)
 
 	if _game.state == Game.State.PLAYING:
 		if _frame >= CONSUMABLE_FRAME:
@@ -223,9 +226,15 @@ func _finish() -> void:
 		if not _states_seen.has(required):
 			problems.append("never reached state %d" % required)
 
-	print("SIM: frames=%d score_max=%d organic_score=%d balls=%d drains=%d consumable=%s ended_in=%d states=%s"
+	# best_chain is reported rather than asserted: it is the one number here that
+	# says how the *table* is playing rather than whether the code runs, and
+	# with fever now costing five contacts a level it is the honest measure of
+	# how much fever a real ball can build. A threshold on it would be a
+	# performance test on CI hardware, which is a different and worse thing.
+	print("SIM: frames=%d score_max=%d organic_score=%d balls=%d drains=%d consumable=%s ended_in=%d best_chain=%d fever_max=%s states=%s"
 		% [_frame, _max_score, _score_before_force, _balls_served, _drains,
-			_fired_consumable, _ended_in, _states_seen.keys()])
+			_fired_consumable, _ended_in, Run.best_chain, _peak_fever,
+			_states_seen.keys()])
 	if problems.is_empty():
 		print("SIM_OK")
 		get_tree().quit(0)

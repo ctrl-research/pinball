@@ -50,6 +50,7 @@ var _nudge: Label
 var _tokens: Label
 var _status: Label
 var _fever: Label
+var _fever_head: Label
 var _queue: Label
 var _queue_pips: Control
 var _fever_bar: ColorRect
@@ -86,6 +87,8 @@ func _process(delta: float) -> void:
 
 	var fever := Run.fever
 	_fever.text = "x%s" % _trim(fever)
+	_fever_head.text = "FEVER  MAX" if fever >= Run.FEVER_MAX else "FEVER  %s" % _pips(
+		Run.fever_hits_done(), Run.FEVER_HITS_PER_LEVEL)
 	_fever.add_theme_color_override("font_color",
 		FEVER_COLOUR if fever > 1.0 else DIM)
 	_fever_bar.size.x = (Cabinet.PANEL_RIGHT.size.x - 8.0) * clampf(
@@ -276,7 +279,11 @@ func _build_right() -> void:
 	# Fever lives here rather than beside MULT because this panel is the
 	# fast-moving one, and fever is the fastest number in the game -- it climbs
 	# on every contact and falls off a cliff two seconds later.
-	_label("FEVER", Vector2(x, p.position.y + 200.0), w, 8, DIM)
+	# The header carries the progress pips, the same way BALLS and NUDGE do.
+	# With five contacts to a level the number itself now sits still most of the
+	# time, and a meter that only moves once every five hits looks broken unless
+	# something shows the four hits in between.
+	_fever_head = _label("FEVER", Vector2(x, p.position.y + 200.0), w, 8, DIM)
 	_fever = _label("x1", Vector2(x, p.position.y + 210.0), w, 20, FEVER_COLOUR)
 
 	var fever_track := ColorRect.new()
@@ -653,6 +660,7 @@ func show_lost() -> void:
 		"Scored %s, needed %s" % [_commas(Run.score), _commas(Run.target)],
 		"Short by %s." % _commas(Run.target - Run.score),
 	])
+	_add_summary()
 	_add_continue("MENU")
 
 
@@ -660,7 +668,54 @@ func show_won() -> void:
 	_open("MACHINE BEATEN", [
 		"All 8 antes cleared.",
 	])
+	_add_summary()
 	_add_continue("MENU")
+
+
+## How the run went, on the screen where the run is over.
+##
+## A run is eight antes long and the only thing a player otherwise carries out
+## of it is whether they died. These are the three numbers that describe how,
+## and they are chosen to be about the *player* rather than about the machine:
+## the best stage is what the build was worth at its peak, the longest combo is
+## how well the flippers were played, and the most-used ball is what the run
+## turned out to be made of.
+func _add_summary() -> void:
+	_overlay_body.add_child(_body_line("", INK))
+
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 4)
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+
+	var ball: Array = Run.most_used_ball()
+	var ball_text := "--"
+	if not str(ball[0]).is_empty():
+		ball_text = "%s  x%d" % [str(Catalog.BALLS[ball[0]]["name"]), int(ball[1])]
+
+	var rows := [
+		["Best stage", "%s%s" % [_commas(Run.best_stage_score),
+			"" if Run.best_stage_label.is_empty() else "   " + Run.best_stage_label]],
+		["Longest combo", "%d hits" % Run.best_chain],
+		["Most-used ball", ball_text],
+	]
+	for row in rows:
+		grid.add_child(_stat_label(str(row[0]), DIM, HORIZONTAL_ALIGNMENT_RIGHT))
+		grid.add_child(_stat_label(str(row[1]), INK, HORIZONTAL_ALIGNMENT_LEFT))
+	_overlay_body.add_child(grid)
+
+
+## A grid cell rather than a centred line: the values line up in a column, which
+## is the only reason to use a table instead of three more sentences.
+func _stat_label(text: String, colour: Color, align: int) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 11)
+	l.add_theme_color_override("font_color", colour)
+	l.horizontal_alignment = align
+	l.custom_minimum_size = Vector2(150.0, 0.0)
+	return l
 
 
 func _open(title: String, lines: Array) -> void:

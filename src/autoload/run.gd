@@ -52,6 +52,12 @@ const COMBO_WINDOW := 1.5
 const FEVER_BASE := 1.0
 const FEVER_STEP := 0.25
 const FEVER_MAX := 5.0
+## Contacts needed to climb one level. A level per hit made the number move so
+## constantly that it read as noise attached to the ball rather than as
+## something the player was building: every contact bumped it, so no contact
+## felt like it mattered. Five gives the meter a floor to climb, and makes the
+## level itself an event worth a sound and a flash.
+const FEVER_HITS_PER_LEVEL := 5
 ## Two seconds of no contact and it is gone. Short enough that it has to be kept
 ## alive deliberately, long enough to survive a trip round the orbit.
 const FEVER_WINDOW := 2.0
@@ -124,6 +130,26 @@ var _spinner_bonus := 0
 var _last_hit_time := -999.0
 var fever := FEVER_BASE
 var _fever_expires := 0.0
+## Progress toward the next level, in contacts. Fractional because Combo Coil
+## and the Ember ball make a hit worth more than one.
+var _fever_progress := 0.0
+## Contacts in the current unbroken chain, and the best chain of the run. Not
+## the same as the level: this keeps counting once fever is capped, which is
+## what makes it worth reporting at the end.
+var fever_chain := 0
+var best_chain := 0
+
+# --- Run statistics -----------------------------------------------------------
+#
+# Kept for the end-of-run summary and nothing else: no rule reads any of this.
+# A run is eight antes long and the only number a player carries out of it is
+# whether they died, so these are the story of how it went.
+
+## The best single stage of the run, and which one it was.
+var best_stage_score := 0
+var best_stage_label := ""
+## Ball id -> how many times it has been served this run.
+var ball_uses := {}
 var _hits_since_jackpot := 0
 var _hits_since_reset := 0
 var _penny_progress := 0
@@ -176,6 +202,10 @@ func new_run(with_seed: int = 0) -> void:
 	current_ball = Catalog.VANILLA
 	mods.clear()
 	levels.clear()
+	best_stage_score = 0
+	best_stage_label = ""
+	best_chain = 0
+	ball_uses.clear()
 	begin_stage()
 	trinkets_changed.emit()
 	consumables_changed.emit()
@@ -232,6 +262,7 @@ func take_next_ball() -> String:
 	# every time it used one, which is an infinite ball.
 	_ghost_saves = ball_level("ghost") if current_ball == "ghost" else 0
 	_lucky_progress = 0
+	ball_uses[current_ball] = int(ball_uses.get(current_ball, 0)) + 1
 	balls_changed.emit()
 	return current_ball
 
@@ -267,6 +298,8 @@ func begin_ball() -> void:
 	_last_hit_time = -999.0
 	fever = FEVER_BASE
 	_fever_expires = 0.0
+	_fever_progress = 0.0
+	fever_chain = 0
 	fever_changed.emit()
 	_hits_since_jackpot = 0
 	_hits_since_reset = 0
@@ -466,19 +499,59 @@ func register_hit(source: int, count: int = 1) -> int:
 ## a trinket that granted +0.2 MULT on quick hits was solving the same problem
 ## fever solves, and two systems for "you are hitting things quickly" is one
 ## more than the player can read.
+##
+## "Builds twice as fast" is applied to *progress* rather than to the step, so
+## Combo Coil and the Ember ball still mean what they say: the level is worth
+## the same 0.25 to everyone, and what they buy is reaching it in half the
+## contacts. Doubling the step instead would have quietly changed the ceiling
+## as well as the rate.
 func _stoke_fever() -> void:
-	var step := FEVER_STEP * (2.0 if has_trinket("combo_coil") else 1.0)
+	var gain := 2.0 if has_trinket("combo_coil") else 1.0
 	if current_ball == "ember":
-		step *= 1.0 + ball_power("ember")
-	fever = minf(FEVER_MAX, fever + step)
+		gain *= 1.0 + ball_power("ember")
+
+	fever_chain += 1
+	best_chain = maxi(best_chain, fever_chain)
+
+	_fever_progress += gain
+	while _fever_progress >= float(FEVER_HITS_PER_LEVEL) and fever < FEVER_MAX:
+		_fever_progress -= float(FEVER_HITS_PER_LEVEL)
+		fever = minf(FEVER_MAX, fever + FEVER_STEP)
+	# At the cap there is nothing left to fill, so the bar reads empty rather
+	# than sitting at some arbitrary fraction of a level that cannot arrive.
+	if fever >= FEVER_MAX:
+		_fever_progress = 0.0
+
 	_fever_expires = float(Time.get_ticks_msec()) + FEVER_WINDOW * 1000.0
 	fever_changed.emit()
+
+
+## The ball served most often this run, and how many times. Ties break on the
+## catalogue's own order so the same run always reports the same ball.
+func most_used_ball() -> Array:
+	var best_id := ""
+	var best_count := 0
+	for id in Catalog.BALLS:
+		var count := int(ball_uses.get(id, 0))
+		if count > best_count:
+			best_id = str(id)
+			best_count = count
+	return [best_id, best_count]
+
+
+## Contacts banked toward the next level, for the readout. Whole hits, because
+## the readout is pips and half a pip is not a thing the player can act on.
+func fever_hits_done() -> int:
+	return clampi(int(floor(_fever_progress)), 0, FEVER_HITS_PER_LEVEL)
 
 
 func _bank(points: int) -> void:
 	if points <= 0:
 		return
 	score += points
+	if score > best_stage_score:
+		best_stage_score = score
+		best_stage_label = "Ante %d %s" % [ante, Catalog.BLIND_NAME[blind]]
 	if not target_met and score >= target:
 		target_met = true
 		balls_left_at_target = balls_left
@@ -585,17 +658,31 @@ func effect_remaining(id: String) -> float:
 ## always slightly wrong and never worth reading; falling off a cliff after two
 ## silent seconds is a rule you can play around.
 func _expire_fever() -> void:
-	if fever <= FEVER_BASE:
+	# Partial progress and the chain count expire too, and that is the whole
+	# point of a combo: five contacts spread over a minute must not add up to a
+	# level. Guarding on `fever > FEVER_BASE` alone would have let a chain that
+	# never reached its first level sit there indefinitely, waiting to be
+	# finished off by an unrelated hit later in the ball.
+	if fever <= FEVER_BASE and _fever_progress <= 0.0 and fever_chain == 0:
 		return
 	if float(Time.get_ticks_msec()) >= _fever_expires:
+		var had_level := fever > FEVER_BASE
 		fever = FEVER_BASE
+		_fever_progress = 0.0
+		fever_chain = 0
 		fever_changed.emit()
-		toast.emit("FEVER LOST")
+		# Only announced when there was a multiplier to lose. Saying "FEVER
+		# LOST" to someone who had not got one yet is a toast about nothing.
+		if had_level:
+			toast.emit("FEVER LOST")
 
 
 ## Seconds left before fever drops, for the readout.
 func fever_remaining() -> float:
-	if fever <= FEVER_BASE:
+	# A chain below the first level still shows its timer: the player is
+	# building something, and hiding the clock until level 1 lands would keep
+	# the bar dark for exactly the five hits it is most useful.
+	if fever <= FEVER_BASE and _fever_progress <= 0.0:
 		return 0.0
 	return maxf(0.0, (_fever_expires - float(Time.get_ticks_msec())) / 1000.0)
 

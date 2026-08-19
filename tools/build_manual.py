@@ -103,6 +103,10 @@ def build(data):
             ("Ball slots", lim["ball_slots"]),
             ("Ball upgrade", "$%d, +$%d per level owned"
                 % (lim["ball_upgrade"], lim["ball_upgrade_step"])),
+            ("Fever: contacts per level", lim["fever_hits"]),
+            ("Fever: per level", "+%gx" % lim["fever_step"]),
+            ("Fever: cap", "x%g" % lim["fever_max"]),
+            ("Fever: chain window", "%gs" % lim["fever_window"]),
             ("Nudges held", lim["nudges"]),
             ("Nudge recharge", "%gs each" % lim["nudge_recharge"]),
             ("Payout multiplier cap", "x%d" % lim["payout_cap"]),

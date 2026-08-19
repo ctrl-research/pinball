@@ -26,14 +26,16 @@ uniform vec2 resolution = vec2(640.0, 360.0);
 // *different* amounts, and that relative motion is what the eye picks up as an
 // unstable signal.
 //
-// Deliberately small: at 640px wide, 0.0011 is about two thirds of a pixel, and
-// the nearest-neighbour sampling quantises it into a clean one-pixel step
-// rather than a smear. Anything larger stops looking like a tube warming up and
-// starts looking like the text is broken.
-uniform float wave_amount : hint_range(0.0, 0.006) = 0.0011;
+// Deliberately small: at 640px wide these amount to about a third of a pixel
+// each, so the nearest-neighbour sampling only crosses into a one-pixel step
+// when the two waves peak together. That is the point of the setting -- the
+// type sits still most of the time and shifts by exactly one pixel now and
+// then, which reads as a signal that is *nearly* locked rather than as text
+// that is permanently swimming.
+uniform float wave_amount : hint_range(0.0, 0.006) = 0.00055;
 uniform float wave_speed : hint_range(0.0, 8.0) = 1.3;
 uniform float wave_freq : hint_range(0.0, 40.0) = 4.0;
-uniform float ripple_amount : hint_range(0.0, 0.004) = 0.0007;
+uniform float ripple_amount : hint_range(0.0, 0.004) = 0.00035;
 uniform float ripple_speed : hint_range(0.0, 20.0) = 5.0;
 uniform float ripple_freq : hint_range(0.0, 400.0) = 110.0;
 
