@@ -38,6 +38,7 @@ const FULL_SLOT := Color(0.16, 0.14, 0.23)
 const CONSUMABLE_SLOT := Color(0.12, 0.18, 0.20)
 
 var _root: Control
+var _type: TextScreen
 var _ante: Label
 var _blind: Label
 var _boss: Label
@@ -124,10 +125,17 @@ func _input(event: InputEvent) -> void:
 
 
 func _build() -> void:
+	# Every panel and every readout is hosted in the text screen rather than on
+	# the CanvasLayer directly, so the UI gets its own tube: native-resolution
+	# pixels, its own scanlines, and a signal wobble that leaves the machine
+	# underneath perfectly still. See `text_screen.gd`.
+	_type = TextScreen.new()
+	add_child(_type)
+
 	_root = Control.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_root)
+	_type.host().add_child(_root)
 
 	_panel_backing(Cabinet.PANEL_LEFT)
 	_panel_backing(Cabinet.PANEL_RIGHT)

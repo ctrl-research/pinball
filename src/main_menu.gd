@@ -7,6 +7,7 @@ const INK := Color(0.86, 0.88, 0.96)
 const DIM := Color(0.48, 0.50, 0.64)
 
 var _seed_field: LineEdit
+var _type: TextScreen
 ## change_scene_to_file is deferred to the end of the frame, so the menu is
 ## still live and still taking input after PLAY is pressed. Without this guard
 ## a second press starts a second run, throwing away the first before anyone
@@ -21,6 +22,13 @@ func _ready() -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
 
+	# The title's type goes through the same tube the HUD's does, so the menu
+	# and the game are made of the same pixels. The background stays outside it:
+	# it is a flat full-screen fill, and running a lateral wobble over something
+	# with no detail in it only moves its edges off the screen.
+	_type = TextScreen.new()
+	add_child(_type)
+
 	_text("TILT", Vector2(0, 62), 56, GOLD)
 	_text("a pinball roguelike", Vector2(0, 126), 16, INK)
 	_text("Beat the score with the balls you are given.\n"
@@ -33,7 +41,7 @@ func _ready() -> void:
 	play.size = Vector2(100, 28)
 	play.add_theme_font_size_override("font_size", 16)
 	play.pressed.connect(_play)
-	add_child(play)
+	_type.host().add_child(play)
 
 	_text("seed (optional)", Vector2(0, 258), 8, DIM)
 	_seed_field = LineEdit.new()
@@ -41,6 +49,10 @@ func _ready() -> void:
 	_seed_field.size = Vector2(100, 20)
 	_seed_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_seed_field.add_theme_font_size_override("font_size", 8)
+	# Deliberately not in the text screen. Typing into a field inside a nested
+	# viewport means its focus and its caret live in a different input context
+	# from the rest of the menu, which is a lot of risk to accept for a wobble
+	# on the one control the player types into.
 	add_child(_seed_field)
 
 	_text("A / D or arrows flip   SPACE plunges   Q / W / E nudge",
@@ -78,5 +90,5 @@ func _text(content: String, pos: Vector2, size: int, colour: Color) -> Label:
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", colour)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(l)
+	_type.host().add_child(l)
 	return l

@@ -72,6 +72,17 @@ jobs:
           ./godot --headless --path . --quit-after 3000 tests/inlane_test.tscn 2>&1 | tee -a build.log
           grep -q "INLANE_TEST_OK" build.log
 
+      # The shop's buy and sell rows are the only part of the game that can be
+      # reached solely with a mouse -- the sim taps space through every other
+      # screen -- and they now sit inside a SubViewportContainer, which has to
+      # forward clicks rather than simply receive them. A shop that stops taking
+      # clicks is an unplayable game that passes every other gate here.
+      - name: Shop click-through test
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . tests/click_test.tscn 2>&1 | tee -a build.log
+          grep -q "CLICK_TEST_OK" build.log
+
       # Fires a ball at every wall from every angle at the speed clamp, with the
       # flippers hammering. A ball that leaves the cabinet never drains, so the
       # stage never ends and the run cannot even be lost -- the worst failure
