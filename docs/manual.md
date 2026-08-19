@@ -71,6 +71,26 @@ immediately — not at the end of the ball.
 when the ball drains. The ball that has been alive longest is worth the most and
 is the one you can least afford to lose.
 
+### Fever
+
+A second multiplier, on top of MULT:
+
+```
+score += value x MULT x FEVER
+```
+
+- Starts each ball at **×1**
+- **+0.25** on every scoring contact
+- Caps at **×5**
+- Drops **straight back to ×1** after **2 seconds** without a contact
+
+MULT is the ball you have built and lose on the drain. Fever is the last two
+seconds. The contact that *starts* a combo scores at ×1 — only the ones after it
+are worth more.
+
+The right-hand panel shows the current fever and a bar counting down the two
+seconds you have left to keep it.
+
 ### What each target is worth
 
 Value is `base + per_level x (level - 1)`, where level is bought in the shop and
@@ -137,7 +157,7 @@ Passive and permanent. The axis you build around. No duplicates.
 | Spinner Fever | Each spin this ball raises spinner value by 5 | $5 | $3 |
 | Tilt Gremlin | +2 MULT while you have no nudges left | $5 | $3 |
 | Ball Saver | The first drain each stage returns the ball | $6 | $4 |
-| Combo Coil | Each hit within 1.5s of the last: +0.2 MULT | $6 | $4 |
+| Combo Coil | Fever builds twice as fast | $6 | $4 |
 | Drop Devotion | Clearing the drop bank: +1 MULT for the stage | $6 | $4 |
 | Penny Slot | $1 per 1,000 points scored | $6 | $4 |
 | Cold Solder | -1 ball per stage, but all values x2 | $7 | $5 |
@@ -164,10 +184,12 @@ its timer rather than stacking the effect.
 | Ball Polish | 20s: all values x2 | 20s | $5 | $3 |
 | Jackpot Charge | 12s: every hit also pays a flat 500 | 12s | $5 | $3 |
 | Second Wind | 30s: a drain returns the ball | 30s | $5 | $3 |
+| Bumper Gravity | 30s: the bumpers pull the ball towards them | 30s | $6 | $4 |
 | Extra Ball | One more ball this stage | instant | $6 | $4 |
 | Overclock | 20s: MULT gains are doubled | 20s | $6 | $4 |
 | Surge | MULT jumps to at least x3, now | instant | $6 | $4 |
 | Slow Ball | 6s: everything runs at 55% speed | 6s | $7 | $5 |
+| Wormhole | 30s: a drained ball returns to the plunger | 30s | $8 | $6 |
 <!-- END GENERATED: consumables -->
 
 ---
