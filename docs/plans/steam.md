@@ -1,0 +1,166 @@
+# Plan — Shipping TILT on Steam
+
+Status: **not started**. TILT is currently a web build on GitHub Pages; the only
+export preset in the repo is `Web`.
+
+This plan separates what only **you** can do (accounts, money, legal identity)
+from what is **engineering** (the game does not yet have the things a desktop
+release needs). The engineering half is larger than it looks, and none of it is
+Steam-specific plumbing — it is features a paying player would expect.
+
+---
+
+## 0. What only you can do
+
+I cannot and should not do any of these. They need your legal identity, your
+bank details, and your money.
+
+- [ ] **Steamworks account** — company/individual details, identity
+      verification.
+- [ ] **Steamworks Direct fee** — $100 USD per title, recoupable against the
+      first $1,000 of adjusted gross revenue.
+- [ ] **Tax and banking** — W-8/W-9 equivalent and payout details. Valve will
+      not release the game until these clear, and they can take days.
+- [ ] **App ID** — issued once the fee clears; everything below keys off it.
+- [ ] Decide **price**, **release date**, and **launch territories**.
+
+Verify current fees and requirements against Steamworks documentation when you
+start — these change, and this file will not.
+
+---
+
+## 1. Engineering gaps
+
+Three things the game does not have. All were confirmed by grep, not assumed:
+
+| Gap | Evidence | Why Steam needs it |
+| --- | --- | --- |
+| **No gamepad support** | Zero `Joypad*` entries in `project.godot`, zero in `src/` | A keyboard-only game is effectively unplayable on Steam Deck and rates poorly on controller-first stores |
+| **No persistence of any kind** | No `FileAccess`, `ConfigFile` or `user://` anywhere in `src/` | Settings do not survive a restart; a run cannot be resumed; nothing is remembered between sessions |
+| **Web-only export** | `export_presets.cfg` contains one preset, `platform="Web"` | No desktop build exists to upload |
+
+### 1a. Gamepad (largest player-facing gap)
+
+The input map has ten actions: `flip_left`, `flip_right`, `plunge`,
+`nudge_left/right/up`, `use_consumable_1..3`, `toggle_crt`. A natural mapping:
+
+- Flippers → **left/right shoulder buttons**. This is what every pinball game
+  does and what a player will try first.
+- Plunge → **A / bottom face**, held, matching the existing charge mechanic.
+- Nudge → **left stick** direction, or the three remaining face buttons.
+- Consumables → **d-pad**.
+
+The shop and all overlays are mouse-driven. Every overlay already focuses its
+continue button so `ui_accept` works, but **the shop's buy and sell rows are
+mouse-only** — that is exactly what `click_test` was written to protect, and on
+a controller it means the shop cannot be used at all. Focus-based navigation
+between shop rows is required, not optional.
+
+### 1b. Persistence
+
+Minimum for a paid release:
+
+- **Settings** — CRT on/off (already a runtime toggle, currently forgotten on
+  quit), volume, window mode.
+- **Run resume** — a roguelike run is long. Quitting mid-run and losing it is
+  the single most common complaint about early-access roguelikes.
+  `Run` is already a single autoload holding all run state, which makes this
+  much cheaper than it would otherwise be: serialise that one object.
+- **Meta progression / stats** — the end-of-run summary already computes best
+  stage, longest combo and most-used ball. Persisting those across runs is a
+  small step and is what makes a "best ever" screen possible.
+
+### 1c. Desktop exports
+
+- Windows, Linux, macOS presets in `export_presets.cfg`.
+- The project runs the **GL Compatibility** renderer, which is the safest choice
+  here — it covers old hardware and the Steam Deck without fuss. The CRT shader
+  samples `hint_screen_texture`, which is supported there; verify on each
+  platform rather than assuming.
+- **macOS** needs notarisation for a warning-free launch, which needs an Apple
+  Developer account (~$99/yr). Consider shipping Windows + Linux first.
+- **Windows** code signing is optional but reduces SmartScreen warnings.
+
+---
+
+## 2. Steam integration
+
+Only needed if you want achievements, cloud saves or the overlay.
+
+- **GodotSteam** is the usual route — a GDExtension wrapper around the
+  Steamworks SDK for Godot 4.x. Check its compatibility against the exact Godot
+  version in `.github/workflows/build.yml` before committing to it.
+- Keep it **isolated behind one autoload** with no-op fallbacks. The web build
+  must keep working, the headless tests must keep running in CI with no
+  Steam client present, and neither should know Steam exists. This is the same
+  shape as the existing `Crt`/`Sfx` autoloads.
+- **Steam Cloud** can be configured to sync a `user://` save path with no code
+  at all — do the persistence work in §1b first and cloud may be free.
+- Achievements need a list designed against real milestones. The run summary
+  stats are the obvious source: longest combo, best stage, beat the machine.
+
+---
+
+## 3. Build and release pipeline
+
+- Builds upload through **SteamPipe** (`steamcmd`), driven by a VDF app/depot
+  config committed to the repo.
+- CI already exports the web build on every push. Extend it to export the
+  desktop targets on a tag, and upload to a Steam **beta branch** — never
+  straight to default. A bad build on default is live to customers.
+- Keep the six existing gates (`RUN_TEST_OK`, `CLICK_TEST_OK`,
+  `INLANE_TEST_OK`, `CONTAINMENT_OK`, `SIM_OK`, manual staleness) as
+  release blockers.
+
+---
+
+## 4. Store page
+
+Assets Valve requires, in several sizes (library capsule, header, main capsule,
+small capsule, screenshots, and a trailer). **Check current dimensions in
+Steamworks documentation** — they have changed more than once and are not worth
+recording here.
+
+Everything here is a *design* job, not a code one, and it is usually
+underestimated:
+
+- Capsule art that reads at thumbnail size. The game's identity is currently
+  primitives-and-shaders; a sprite pass may be worth doing first so the
+  screenshots and the game agree.
+- A trailer. Pinball demos well — a 30s cut of a long combo with the fever
+  meter climbing does most of the work.
+- Short and long description, tags, genre.
+- **Content survey and age rating.**
+
+---
+
+## 5. Timeline constraints
+
+Two hard ones that catch people out:
+
+- The store page must be **public ("Coming Soon") for at least two weeks**
+  before the release date.
+- Valve **reviews the build and the store page** before either goes live —
+  budget several business days, and longer if something is rejected.
+
+So the earliest realistic release is *engineering complete* → *store page up* →
+*two weeks minimum* → *launch*. Plan backwards from a date, not forwards from a
+finish.
+
+---
+
+## Suggested order
+
+1. **Desktop export presets** — smallest step, and it tells you immediately
+   whether the shaders behave off the web.
+2. **Gamepad support**, including controller navigation of the shop. Biggest
+   player-facing gap and the one that gates Steam Deck.
+3. **Persistence** — settings, then run resume, then stats.
+4. **Store page up** (starts the two-week clock running in parallel with the
+   rest).
+5. **Steam integration** — achievements and cloud, once saves exist.
+6. **SteamPipe pipeline**, uploading to a beta branch from CI.
+7. **Art and trailer** — the long pole, and the thing that sells it.
+
+Note that steps 1–3 are all things the game would want anyway. Only 5 and 6 are
+genuinely Steam-specific.
