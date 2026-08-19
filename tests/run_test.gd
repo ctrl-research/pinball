@@ -12,6 +12,15 @@ extends Node
 var _failures := 0
 
 
+## Every section registers itself as it finishes. A runtime error inside one --
+## a failed typed assignment, say -- aborts that function without touching the
+## failure count, so the suite would otherwise print OK having quietly skipped
+## everything after the error. This is the check that caught exactly that.
+const SECTIONS := 16
+
+var _sections := 0
+
+
 func _ready() -> void:
 	_targets()
 	_base_scoring()
@@ -29,6 +38,11 @@ func _ready() -> void:
 	_fever()
 	_balls()
 	_summary()
+
+	if _sections != SECTIONS:
+		_failures += 1
+		print("FAIL: %d of %d sections finished -- one died part way through"
+			% [_sections, SECTIONS])
 
 	if _failures > 0:
 		push_error("RUN_TEST_FAILED: %d check(s)" % _failures)
@@ -69,6 +83,7 @@ func _targets() -> void:
 	_eq(Catalog.blind_target(1, Catalog.BIG), 450, "ante 1 big blind")
 	_eq(Catalog.blind_target(1, Catalog.BOSS), 600, "ante 1 boss blind")
 	_eq(Catalog.blind_target(8, Catalog.BOSS), 100000, "ante 8 boss blind")
+	_sections += 1
 
 
 func _base_scoring() -> void:
@@ -87,6 +102,7 @@ func _base_scoring() -> void:
 	# is worth shooting.
 	Run.new_run(1002)
 	_eq(Run.register_hit(Catalog.Source.SPINNER, 10), 50, "10 spinner revolutions")
+	_sections += 1
 
 
 func _trinkets() -> void:
@@ -122,6 +138,7 @@ func _trinkets() -> void:
 		_check(Run.add_trinket(id), "trinket %s fits" % id)
 	_check(not Run.add_trinket("deadhead"), "the sixth trinket is refused")
 	_check(not Run.add_trinket("brass_bumper"), "duplicates are refused")
+	_sections += 1
 
 
 func _levels() -> void:
@@ -130,6 +147,7 @@ func _levels() -> void:
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 18, "Bumpers Lv2 is 10 + 8")
 	Run.level_up(Catalog.Source.BUMPER)
 	_eq(_cold_hit(Catalog.Source.BUMPER), 26, "Bumpers Lv3 is 10 + 16")
+	_sections += 1
 
 
 func _bosses() -> void:
@@ -154,6 +172,7 @@ func _bosses() -> void:
 	for i in 5:
 		Run.register_hit(Catalog.Source.SLINGSHOT)
 	_eq(Run.mult, 1.0, "The Reset drops MULT every 5th hit")
+	_sections += 1
 
 
 func _tilt() -> void:
@@ -165,6 +184,7 @@ func _tilt() -> void:
 	_check(Run.tilted, "and the machine is tilted")
 	_eq(Run.mult, 1.0, "a tilt costs the MULT")
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 0, "a tilted machine scores nothing")
+	_sections += 1
 
 
 func _deadhead() -> void:
@@ -178,6 +198,7 @@ func _deadhead() -> void:
 	Run.add_mult(4.0)
 	Run.begin_ball()
 	_eq(Run.mult, 5.0, "Deadhead carries MULT between balls")
+	_sections += 1
 
 
 func _economy() -> void:
@@ -198,6 +219,7 @@ func _economy() -> void:
 	Run.tokens = 0
 	Run.register_hit(Catalog.Source.ORBIT, 10)  # 100 * 10 = 1000
 	_eq(Run.tokens, 1, "Penny Slot pays $1 per 1,000 points")
+	_sections += 1
 
 
 func _progression() -> void:
@@ -222,6 +244,7 @@ func _progression() -> void:
 	_check(Run.stage_won(), "hitting the target clears the stage")
 	var payout := Run.stage_payout()
 	_check(payout.size() >= 1, "clearing always pays the blind reward")
+	_sections += 1
 
 
 ## A stage no longer ends the moment the target falls; it runs all of its balls
@@ -281,6 +304,7 @@ func _stage_completion() -> void:
 	_eq(Run.balls_left, 0, "three drains use three balls")
 	_check(not Run.stage_won(), "with no score the target is missed")
 	_check(Run.run_lost(), "which is a loss")
+	_sections += 1
 
 
 ## Inventory limits and selling.
@@ -377,6 +401,7 @@ func _inventory() -> void:
 	# Nor can you buy a duplicate trinket.
 	_check(not Run.can_take({"kind": "trinket", "id": "brass_bumper", "cost": 4}),
 		"duplicated trinkets are refused")
+	_sections += 1
 
 
 ## Consumables are fired mid-ball and most of them run on a real-time clock.
@@ -449,6 +474,7 @@ func _consumables() -> void:
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 20, "two Ball Polish is still x2, not x4")
 
 	_check(not Run.use_consumable(0), "firing nothing fails cleanly")
+	_sections += 1
 
 
 ## Slow Ball drives Engine.time_scale, and a leaked time scale would slow the
@@ -462,6 +488,7 @@ func _slow_ball() -> void:
 
 	Run.begin_stage()
 	_check(not Run.effect_active("slow_ball"), "and a new stage ends it")
+	_sections += 1
 
 
 ## Fever: a short-term combo multiplier stacked on top of MULT.
@@ -549,6 +576,7 @@ func _fever() -> void:
 	Run.register_hit(Catalog.Source.BUMPER)
 	_eq(Run.fever, 1.25, "Combo Coil reaches it in three rather than five")
 	_eq(Run.FEVER_STEP, 0.25, "and the level is worth the same to everyone")
+	_sections += 1
 
 
 ## Ball slots, the draw, and each ball's effect.
@@ -682,6 +710,7 @@ func _balls() -> void:
 		Run.add_ball("ember")
 	_check(not Run.can_take({"kind": "ball", "id": "gold", "cost": 7}),
 		"a full rack cannot take another ball")
+	_sections += 1
 
 
 ## The end-of-run summary. Nothing here feeds a rule, so the only thing that can
@@ -716,7 +745,16 @@ func _summary() -> void:
 	# played rather than of what was owned.
 	Run.new_run(1081)
 	for i in 12:
-		Run.ball_queue = ["gold"] if i < 8 else ["ember"]
+		# Assigned as plain literals rather than through a ternary. `ball_queue`
+		# is Array[String]; GDScript converts a literal at compile time, but a
+		# ternary's static type is an untyped Array, so the assignment fails at
+		# *runtime* -- and a failed assignment aborts the rest of the function,
+		# which is how the second half of this test silently stopped running
+		# while the suite still reported OK.
+		if i < 8:
+			Run.ball_queue = ["gold"]
+		else:
+			Run.ball_queue = ["ember"]
 		Run.take_next_ball()
 	_eq(int(Run.ball_uses.get("gold", 0)), 8, "every Gold served is counted")
 	_eq(int(Run.ball_uses.get("ember", 0)), 4, "and every Ember")
@@ -726,10 +764,11 @@ func _summary() -> void:
 
 	# Run-scoped, not stage-scoped: a new stage must not wipe the story so far.
 	Run.register_hit(Catalog.Source.ORBIT, 3)  # 300
-	Run.register_hit(Catalog.Source.BUMPER)    # and a chain of 2
 	_eq(Run.best_stage_score, 300, "the stage is on the board")
+	Run.register_hit(Catalog.Source.BUMPER)    # +10, and a chain of 2
+	_eq(Run.best_stage_score, 310, "and keeps climbing with the score")
 	Run.begin_stage()
-	_eq(Run.best_stage_score, 300, "and survives the next stage starting")
+	_eq(Run.best_stage_score, 310, "and survives the next stage starting")
 	_eq(Run.best_chain, 2, "as does the best chain")
 	_eq(int(Run.ball_uses.get("gold", 0)), 8, "and the ball tally")
 
@@ -737,3 +776,4 @@ func _summary() -> void:
 	_eq(Run.best_stage_score, 0, "only a new run clears the best stage")
 	_eq(Run.best_chain, 0, "the best chain")
 	_eq(Run.ball_uses.size(), 0, "and the tally")
+	_sections += 1
