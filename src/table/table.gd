@@ -25,6 +25,13 @@ const OUTLANE_GUARD_SHIFT := -6.0
 
 ## Charge per second on the plunger, so a full pull takes ~0.7s of holding.
 const PLUNGE_CHARGE_RATE := 1.4
+## Bumper Gravity. Deliberately weak and short-ranged: a pull strong enough to
+## visibly yank the ball is a pull strong enough to hold it in the nest forever,
+## and a consumable that ends the ball is not a power-up. This nudges the ball's
+## path towards the cluster and lets the bumpers do the rest.
+const GRAVITY_WELL_FORCE := 260.0
+const GRAVITY_WELL_RANGE := 90.0
+
 const NUDGE_IMPULSE := 105.0
 const SHAKE_DECAY := 9.0
 const WARP_PERIOD := 3.0
@@ -62,6 +69,8 @@ var _gate: StaticBody2D
 var _gate_shape: CollisionShape2D
 var _gate_sensor: Area2D
 var _gate_closed_for := 0.0
+var _bumper_spots: Array = []
+var _portal_t := 0.0
 
 
 func _ready() -> void:
@@ -159,6 +168,7 @@ func _build_bumpers() -> void:
 	var spots: Array = TableLayout.BUMPERS.duplicate()
 	if Run.has_mod("extra_bumper"):
 		spots.append(TableLayout.BUMPER_MOD_SLOT)
+	_bumper_spots = spots
 	for spot in spots:
 		var b := Bumper.new()
 		b.position = spot
@@ -369,6 +379,10 @@ func _physics_process(delta: float) -> void:
 
 	_track_balls()
 	_catch_escapees()
+	_apply_bumper_gravity(delta)
+	if Run.effect_active("wormhole"):
+		_portal_t += delta
+		queue_redraw()
 	_update_plunger(delta)
 	_update_gate(delta)
 	_update_warp(delta)
@@ -392,6 +406,27 @@ func _track_balls() -> void:
 			b.set_meta("via_outlane", true)
 
 
+## Pulls the ball towards the bumper cluster while Bumper Gravity is running.
+##
+## Falls off with distance and stops entirely beyond its range, so the rest of
+## the table plays normally -- the effect is "the nest is sticky", not "the
+## table is tilted".
+func _apply_bumper_gravity(delta: float) -> void:
+	if not Run.effect_active("bumper_gravity"):
+		return
+	for b in balls:
+		if not is_instance_valid(b) or b.in_plunger_lane:
+			continue
+		for spot in _bumper_spots:
+			var to_bumper: Vector2 = spot - b.position
+			var distance := to_bumper.length()
+			if distance < 1.0 or distance > GRAVITY_WELL_RANGE:
+				continue
+			var falloff := 1.0 - distance / GRAVITY_WELL_RANGE
+			b.apply_central_impulse(
+				to_bumper / distance * GRAVITY_WELL_FORCE * falloff * delta)
+
+
 ## Sweeps up any ball that has left the table, as if it had drained.
 func _catch_escapees() -> void:
 	for b in balls.duplicate():
@@ -406,7 +441,22 @@ func _catch_escapees() -> void:
 
 
 ## Removes a ball from play, ending the ball if it was the last one out.
+##
+## Unless the Wormhole is open, in which case the ball is not lost at all: it
+## comes back up the plunger lane and the player re-plunges it. That is the
+## whole consumable -- for thirty seconds the bottom of the table stops being
+## the end of the ball.
 func _retire_ball(b: Ball, via_outlane: bool) -> void:
+	if Run.effect_active("wormhole") and is_instance_valid(b):
+		b.position = TableLayout.BALL_REST
+		b.linear_velocity = Vector2.ZERO
+		b.angular_velocity = 0.0
+		b.in_plunger_lane = true
+		b.set_meta("via_outlane", false)
+		_plunge = 0.0
+		Sfx.play("plunge")
+		Run.toast.emit("WORMHOLE")
+		return
 	balls.erase(b)
 	b.queue_free()
 	# Deferred because this runs inside the physics server's query flush: the
@@ -576,6 +626,7 @@ func _draw() -> void:
 	# reads as a bug, and on a real machine it is a wire flap you barely notice.
 	draw_line(TableLayout.GATE_A, TableLayout.GATE_B, Color(0.34, 0.36, 0.50), 2.0)
 
+	_draw_portals()
 	_draw_plunger()
 
 
@@ -595,6 +646,28 @@ func _draw_playfield() -> void:
 		var y := height * float(i) / float(bands)
 		draw_rect(Rect2(0.0, y, TableLayout.WIDTH, height / float(bands) + 1.0),
 			BG_FAR.lerp(BG_NEAR, t))
+
+
+## The two mouths of the wormhole: one across the drain, one at the plunger.
+## Drawn only while it is open, because a portal that is always there stops
+## reading as a thing you spent money on.
+func _draw_portals() -> void:
+	if not Run.effect_active("wormhole"):
+		return
+	var pulse := 0.5 + 0.5 * sin(_portal_t * 5.0)
+	_draw_portal(Vector2(TableLayout.LOWER_CENTRE, TableLayout.DRAIN_Y - 4.0), 46.0, pulse)
+	_draw_portal(TableLayout.BALL_REST + Vector2(0.0, 6.0), 12.0, 1.0 - pulse)
+
+
+func _draw_portal(at: Vector2, width: float, pulse: float) -> void:
+	var rings := 4
+	for i in rings:
+		var t := float(i) / float(rings)
+		var w := width * (1.0 - t * 0.55)
+		var h := w * 0.34
+		var glow := Color(0.45, 0.30, 0.95).lerp(Color(0.60, 0.95, 1.0), t + pulse * 0.25)
+		glow.a = 0.30 + 0.55 * (1.0 - t) * (0.55 + 0.45 * pulse)
+		draw_arc(at, w * 0.5, 0.0, TAU, 24, glow, maxf(1.0, h * 0.22))
 
 
 func _draw_plunger() -> void:

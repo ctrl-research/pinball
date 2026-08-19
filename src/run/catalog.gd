@@ -63,7 +63,7 @@ const TRINKETS := {
 		"cost": 4, "rarity": COMMON,
 	},
 	"combo_coil": {
-		"name": "Combo Coil", "desc": "Each hit within 1.5s of the last: +0.2 MULT",
+		"name": "Combo Coil", "desc": "Fever builds twice as fast",
 		"cost": 6, "rarity": UNCOMMON,
 	},
 	"skill_shot": {
@@ -153,6 +153,17 @@ const CONSUMABLES = {
 	## powerful thing you can hand a player in a real-time game, so it is also
 	## the shortest and the dearest -- six seconds is enough to save one ball you
 	## had already lost, and not enough to play the game in.
+	## Both of these act on the *table* rather than on the arithmetic, which is
+	## what makes them worth their price: no other consumable changes where the
+	## ball goes.
+	"bumper_gravity": {
+		"name": "Bumper Gravity", "desc": "30s: the bumpers pull the ball towards them",
+		"cost": 6, "duration": 30.0,
+	},
+	"wormhole": {
+		"name": "Wormhole", "desc": "30s: a drained ball returns to the plunger",
+		"cost": 8, "duration": 30.0,
+	},
 	"slow_ball": {
 		"name": "Slow Ball", "desc": "6s: everything runs at 55% speed",
 		"cost": 7, "duration": 6.0,

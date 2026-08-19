@@ -136,6 +136,36 @@ to work — it roughly triples early and then stretches:
 
 Small blind = base ×1, big blind = ×1.5, boss blind = ×2.
 
+### Fever
+
+A second multiplier, stacked on top of MULT rather than folded into it:
+
+```
+score += value x MULT x FEVER
+```
+
+Fever climbs by ×0.25 on every scoring contact, caps at ×5, and **falls all the
+way back to ×1 after two seconds without one**. MULT is the ball you have built
+over twenty seconds and lose on the drain; fever is the last two seconds.
+
+Two multipliers rather than one because they answer different questions and are
+earned in different ways. MULT rewards *keeping the ball alive*; fever rewards
+*hitting things quickly*, which is what makes a bumper nest feel different from
+a slow, careful ball that has been in play a while. Folded together, a player
+could not tell which of the two things they were being paid for.
+
+It decays as a cliff rather than a slope. A slow bleed would mean the number is
+always slightly wrong and never worth reading; falling off after two silent
+seconds is a rule you can play around — and it makes the orbit, which takes
+about that long, a genuine gamble with a combo in hand.
+
+The cap is load-bearing. Uncapped, a bumper nest on a stacked MULT would produce
+numbers that make the ante curve meaningless.
+
+`Combo Coil` was a trinket that granted +0.2 MULT on quick hits, which is the
+same problem fever solves. It now builds fever twice as fast instead — two
+systems for "you are hitting things quickly" is one more than a player can read.
+
 ### Scoring
 
 Every scoring element carries a **value**. The playfield carries a **MULT**.
@@ -363,6 +393,28 @@ Refiring an effect that is already running restarts its timer rather than
 stacking, because two overlapping Ball Polish would be ×4 and nothing in the
 shop says so. Stacking is about how many you *hold*, not how many can run at
 once.
+
+#### Two that act on the table
+
+Most consumables change the arithmetic. Two change where the ball goes, which is
+what earns them their price.
+
+**Bumper Gravity** gives each pop bumper a short-range pull for 30 seconds. It
+is deliberately weak: a force strong enough to visibly yank the ball is strong
+enough to hold it in the nest until the stage ends, and a power-up that ends the
+ball is not a power-up. The effect is "the nest is sticky", not "the table is
+tilted" — it bends the ball's path toward the cluster and lets the bumpers do
+the rest.
+
+**Wormhole** is the expensive one. For 30 seconds the bottom of the table stops
+being the end of the ball: anything that would drain instead comes back up the
+plunger lane to be re-plunged. Portals are drawn at both mouths — across the
+drain and at the plunger — and only while it is open, because a portal that is
+always there stops reading as something you spent money on.
+
+Wormhole is priced as the most expensive consumable because it removes the
+game's only real threat. Thirty seconds of not being able to lose is worth more
+than any multiplier, and it should cost accordingly.
 
 #### Why Heavy Ball is not here
 
