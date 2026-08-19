@@ -545,22 +545,25 @@ inserts, a segmented-LED score readout on the panel.
   is the mildest setting of all, because it sits on top of the playfield's own
   perspective warp and two distortions arguing with each other look like a bug.
 
-- **The type is pixel type.** Silkscreen Bold (SIL OFL 1.1) is the project-wide
+- **The type is pixel type.** Jersey 25 (SIL OFL 1.1) is the project-wide
   default, set once on the theme in `src/autoload/style.gd` rather than as an
   override on every label — nothing in the UI asks for a font by name, only for
-  sizes, so the whole game restyles from one line.
+  sizes, so the whole game restyles from one line. The manual embeds the same
+  face, so the reference and the game read as one thing.
 
-  Balatro's own face is m6x11 by Daniel Linssen, and the nearest openly-licensed
-  match, Pixelify Sans, was tried first and rejected on legibility rather than
-  taste: at every size from 7 to 24 it drew "BEAT" as "GEAT" and "flip" as
-  "Aip". A font that cannot spell BEAT is not a candidate however well it
-  matches a reference.
+  It is the third face tried, and both rejections were decided by rendering the
+  same confusable string rather than by taste. Balatro's own face is m6x11 by
+  Daniel Linssen; the nearest openly-licensed match, **Pixelify Sans**, drew
+  "BEAT" as "GEAT" and "flip" as "Aip" at every size from 7 to 24.
+  **Silkscreen** replaced it and lasted until play: its `4` is malformed enough
+  to read as a `9`, and its `H` and `M` are near-identical at panel sizes.
 
-  Silkscreen is drawn on an **8px grid**, so sizes that are multiples of 8 land
-  on whole pixels and anything else resamples. New text should prefer 8, 16 and
-  24. It also draws lowercase as small caps, which means the whole interface
-  reads as capitals — arcade-appropriate, and a real change to the tone of the
-  longer menu prose.
+  Jersey 25 separates `H`/`M`, `4`/`9`, `B`/`8`, `0`/`O` and `I`/`L`/`1`
+  cleanly, is narrower into the bargain — it fits a whole panel line where
+  Silkscreen ran out — and has real lowercase, which Silkscreen did not. The
+  interface is no longer forced into capitals.
+
+  Sizes should still be **whole pixels**; multiples of 8 land crispest.
 
 - **Art is not pixel art yet.** Everything on the playfield is currently drawn
   from the same `TableLayout` numbers that generate its collision, at 640×360

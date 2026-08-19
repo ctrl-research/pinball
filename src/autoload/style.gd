@@ -10,23 +10,25 @@ extends Node
 ## an OpenType tag, and a tag hand-encoded as an integer in a resource file is
 ## unreadable and silently wrong if it is off by one byte.
 
-const FONT_PATH := "res://assets/fonts/Silkscreen-Bold.ttf"
+const FONT_PATH := "res://assets/fonts/Jersey25.ttf"
 
-## Silkscreen is drawn on an 8px grid, so sizes that are multiples of 8 land on
-## whole pixels and anything else resamples -- at 7px the W loses a column and
-## reads as a different glyph entirely. Prefer 8, 16 and 24 for new text; the
-## in-between sizes the panels use are legible but not crisp, and that is the
-## price of fitting this much text into a 166px column.
+## Jersey 25 is far less grid-sensitive than Silkscreen was -- it stays legible
+## between multiples -- but multiples of 8 still land on whole pixels and look
+## crispest, so prefer them for new text.
 const DESIGN_GRID := 8
 
-## Silkscreen ships Regular and Bold as separate files rather than a weight
-## axis, so "heavy" is the file we load, not a number we ask for.
+## Jersey 25 is the heavy member of its family, so "bold" is the file rather
+## than a weight axis to ask for.
 ##
-## Pixelify Sans was tried first, as the closest OFL match to Balatro's own
-## m6x11. It was rejected on legibility, not taste: at *every* size from 7 to
-## 24 it drew "BEAT" as "GEAT", "flip" as "Aip" and capital E as a euro sign.
-## A font that cannot spell the word BEAT is not a candidate, however well it
-## matches a reference.
+## It is the third face tried, and each rejection was on legibility rather than
+## taste, decided by rendering the same confusable string in each:
+##
+##   Pixelify Sans  drew "BEAT" as "GEAT" and "flip" as "Aip", at every size.
+##   Silkscreen     drew a malformed 4 that reads as a 9, and an H and M that
+##                  are near-identical at panel sizes.
+##
+## Jersey 25 separates H/M, 4/9, B/8, 0/O and I/L/1 cleanly, and is narrower
+## into the bargain -- it fits a whole panel line where Silkscreen ran out.
 
 
 func _ready() -> void:

@@ -80,12 +80,17 @@ Design lives in [docs/game-design.md](docs/game-design.md), build order in
 - **Screen layout lives in `cabinet.gd`.** Panels are positioned relative to the
   machine, so there is one source for it. `Cabinet.TOP_SCALE` is shared with the
   shader and the two must agree, or the rails stop lining up with the playfield.
-- **Font sizes should be multiples of 8.** Silkscreen is drawn on an 8px grid;
-  off-grid sizes resample and lose columns (at 7px the W reads as a different
-  glyph). The typeface is set once on the default theme in
-  `src/autoload/style.gd` — note that `ThemeDB.fallback_font` alone does
+- **Font sizes should be whole pixels, and multiples of 8 look crispest.** The
+  typeface is a pixel face (Jersey 25) set once on the default theme in
+  `src/autoload/style.gd`. Two traps: `ThemeDB.fallback_font` alone does
   nothing, because the default theme ships its own `default_font` and a theme
-  always wins over the fallback.
+  always beats the fallback; and a *fractional* size resamples the glyphs — in
+  the manual, `8` at 17.5px rendered as `B`.
+- **Judge a candidate font on confusable pairs, not on vibe.** Two faces have
+  been rejected here after looking right in isolation: Pixelify Sans drew
+  "BEAT" as "GEAT", and Silkscreen drew a malformed `4` and a near-identical
+  `H`/`M`. Render `HM 49 B8 O0 IL1 EF S5 2Z` at the sizes the panels use before
+  committing to anything.
 - **Building a Label in code: set `autowrap_mode` before `size`.** A Label grows
   to its own minimum size, and an unwrapped Label's minimum width is the full
   width of its text — setting autowrap afterwards is too late, and a long line
