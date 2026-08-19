@@ -17,6 +17,7 @@ signal tokens_changed
 signal stage_changed
 signal nudges_changed
 signal fever_changed
+signal coils_changed
 signal ball_awarded  ## a trinket conjured an extra ball onto the playfield
 signal toast(text: String)
 
@@ -33,6 +34,12 @@ const MAX_STACK := 5
 ## Gold in five slots is plainly a 2-in-5 chance, in a way that a separate
 ## weight table never would be.
 const BALL_SLOTS := 5
+
+## Three rather than five. Coils change how the machine *feels* in the hand, and
+## a player wearing five feel-changes at once cannot tell which one is doing
+## what -- a limit that keeps the layer legible is worth more here than one that
+## matches the other categories for symmetry.
+const MAX_COILS := 3
 const BASE_BALLS := 3
 const MAX_NUDGES := 2
 const NUDGE_RECHARGE := 5.0  # seconds per nudge
@@ -90,6 +97,7 @@ var ball_levels := {}  ## ball id -> level, absent means 1
 ## see and plan around, instead of the machine appearing to cheat at the moment
 ## it matters.
 var ball_queue: Array[String] = []
+var coils: Array[String] = []
 var current_ball := Catalog.VANILLA
 var mods: Array[String] = []
 var levels := {}  ## Catalog.Source -> int, absent means level 1
@@ -202,6 +210,7 @@ func new_run(with_seed: int = 0) -> void:
 	current_ball = Catalog.VANILLA
 	mods.clear()
 	levels.clear()
+	coils.clear()
 	best_stage_score = 0
 	best_stage_label = ""
 	best_chain = 0
@@ -210,6 +219,7 @@ func new_run(with_seed: int = 0) -> void:
 	trinkets_changed.emit()
 	consumables_changed.emit()
 	balls_changed.emit()
+	coils_changed.emit()
 	tokens_changed.emit()
 
 
@@ -866,7 +876,34 @@ func can_take(offer: Dictionary) -> bool:
 		"ball_upgrade":
 			# Upgrading a ball you do not own would be buying nothing.
 			return ball_slots.has(str(offer["id"]))
+		"coil":
+			return coils.size() < MAX_COILS and not has_coil(str(offer["id"]))
 	return true
+
+
+## Coils are held, not slotted: unlike balls there is no "empty" coil, so the
+## list simply closes up when one is sold -- the same shape as trinkets.
+func has_coil(id: String) -> bool:
+	return coils.has(id)
+
+
+func add_coil(id: String) -> bool:
+	if coils.size() >= MAX_COILS or has_coil(id):
+		return false
+	coils.append(id)
+	coils_changed.emit()
+	return true
+
+
+func sell_coil(index: int) -> int:
+	if index < 0 or index >= coils.size():
+		return 0
+	var price := Catalog.sell_price("coil", coils[index])
+	coils.remove_at(index)
+	tokens += price
+	tokens_changed.emit()
+	coils_changed.emit()
+	return price
 
 
 func add_mod(id: String) -> bool:
@@ -921,6 +958,10 @@ func roll_shop(count: int = 4) -> Array:
 	for id in Catalog.MODS:
 		if not has_mod(id):
 			mod_pool.append(id)
+	var coil_pool: Array = []
+	for id in Catalog.COILS:
+		if not has_coil(id):
+			coil_pool.append(id)
 	var consumable_pool: Array = Catalog.CONSUMABLES.keys()
 	var ball_pool: Array = []
 	for id in Catalog.BALLS:
@@ -949,7 +990,12 @@ func roll_shop(count: int = 4) -> Array:
 				"cost": Catalog.ball_upgrade_cost(lvl),
 			})
 			continue
-		if roll < 0.55 and not trinket_pool.is_empty():
+		if roll < 0.36 and not coil_pool.is_empty() and coils.size() < MAX_COILS:
+			var id: String = coil_pool[rng.randi() % coil_pool.size()]
+			coil_pool.erase(id)
+			offers.append(_offer("coil", id, Catalog.COILS[id]))
+			continue
+		if roll < 0.58 and not trinket_pool.is_empty():
 			var id: String = trinket_pool[rng.randi() % trinket_pool.size()]
 			trinket_pool.erase(id)
 			offers.append(_offer("trinket", id, Catalog.TRINKETS[id]))
@@ -999,6 +1045,8 @@ func buy(offer: Dictionary) -> bool:
 			add_ball(str(offer["id"]))
 		"ball_upgrade":
 			upgrade_ball(str(offer["id"]))
+		"coil":
+			add_coil(str(offer["id"]))
 		"mod":
 			add_mod(str(offer["id"]))
 		"level":

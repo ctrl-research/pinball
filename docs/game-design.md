@@ -718,8 +718,9 @@ inserts, a segmented-LED score readout on the panel.
 
 Work that is designed but not built keeps its plan next to the design:
 
-- [Coils](plans/coils.md) — the flipper/survival layer, the one modifier
-  category with nothing implemented behind it.
+- [Coils](plans/coils.md) — **built**, except `Second Coil` (an upper-left
+  flipper), which is held back because it changes the shape of the upper
+  playfield and the containment suite covers 156 cases of that.
 - [Shipping on Steam](plans/steam.md) — what a desktop release needs, most of
   which is not Steam-specific.
 

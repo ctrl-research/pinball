@@ -67,6 +67,19 @@ func _ready() -> void:
 			"at": Vector2(14, 250), "want_outlane": true, "wormhole": true,
 			"box": Rect2(130, 282, 44, 42),
 		},
+		# Kickback and the Wormhole share the one seam in _retire_ball(), and
+		# they must not eat each other: the kickback fires first because it puts
+		# the ball back into play rather than back in the lane.
+		{
+			"name": "kickback returns a left-outlane ball to the playfield",
+			"at": Vector2(14, 250), "want_outlane": true, "coil": "kickback",
+			"box": Rect2(130, 282, 44, 42),
+		},
+		{
+			"name": "kickback fires only once a stage",
+			"at": Vector2(14, 250), "want_outlane": true, "coil": "kickback",
+			"used": true, "box": Rect2(130, 282, 44, 42),
+		},
 		# The weakest plunge has to be a real shot. Twice now the floor has been
 		# set to a speed that merely gets the ball out of the lane, which is a
 		# lower bar than getting it onto the playfield: the ball crests the arch
@@ -98,6 +111,15 @@ func _next_case() -> void:
 	Run.effects.erase("wormhole")
 	if bool(_cases[_index].get("wormhole", false)):
 		Run.effects["wormhole"] = Time.get_ticks_msec() + 60_000
+	Run.coils.clear()
+	var coil := str(_cases[_index].get("coil", ""))
+	if coil != "":
+		Run.add_coil(coil)
+	_table.reset_stage_saves()
+	if bool(_cases[_index].get("used", false)):
+		# Spend the one kickback before the case starts, so what is tested is
+		# the second ball down the same outlane.
+		_table._kickback_used = true
 	_ball = _table.spawn_ball_at(_cases[_index]["at"])
 	if bool(_cases[_index].get("plunge", false)):
 		_ball.linear_velocity = Vector2(0.0, -TableLayout.PLUNGE_MIN_SPEED)
@@ -120,7 +142,21 @@ func _physics_process(_delta: float) -> void:
 	if _frames < int(case.get("frames", SETTLE_FRAMES)):
 		return
 
-	if bool(case.get("plunge", false)):
+	if str(case.get("coil", "")) == "kickback":
+		var alive := is_instance_valid(_ball) and _table.balls.has(_ball)
+		if bool(case.get("used", false)):
+			if alive:
+				_fail("%s -- a second ball was saved too" % case["name"])
+			else:
+				print("  ok: %s" % case["name"])
+		elif not alive:
+			_fail("%s -- the ball was lost anyway" % case["name"])
+		elif _ball.in_plunger_lane:
+			_fail("%s -- it ended in the plunger lane, which is the wormhole's job"
+				% case["name"])
+		else:
+			print("  ok: %s (returned to %s)" % [case["name"], _ball.position.round()])
+	elif bool(case.get("plunge", false)):
 		# Only how far left it got matters: a ball that never crosses into the
 		# playfield cannot hit anything, however long it stays alive.
 		if _min_x > float(case["reach_x"]):

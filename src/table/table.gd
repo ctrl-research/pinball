@@ -34,6 +34,23 @@ const GRAVITY_WELL_RANGE := 90.0
 
 const NUDGE_IMPULSE := 105.0
 const SHAKE_DECAY := 9.0
+
+## How close to the bat a falling ball has to be for Dead Bounce to catch it,
+## and how long before the same ball can be caught again. The cooldown is what
+## makes it one kick per landing rather than one per physics tick.
+const DEAD_BOUNCE_REACH := TableLayout.BALL_RADIUS + TableLayout.FLIPPER_RADIUS + 2.5
+const DEAD_BOUNCE_COOLDOWN_MS := 300.0
+
+## Where the Post Save coil arms: below the flipper pivots, and only for a ball
+## falling down the middle. Armed higher it would fire on balls the player was
+## about to hit perfectly well.
+const POST_ARM_Y := 312.0
+const POST_ARM_WIDTH := 14.0
+
+## How hard the Kickback coil fires a ball back up the left outlane. Enough to
+## clear the lane and rejoin the playfield, on the same reasoning as the plunge
+## floor: a save that returns the ball to the same spot is not a save.
+const KICKBACK_SPEED := 620.0
 const WARP_PERIOD := 3.0
 const DROP_RESET_DELAY := 0.8
 
@@ -56,6 +73,13 @@ var active := false
 var _wall_lines: Array = []
 var _solid_polys: Array = []
 var _outlane_polys: Array = []
+var _post: StaticBody2D
+var _post_collision: CollisionShape2D
+## Post Save and Kickback are each one use, and they differ in what resets them:
+## the post is per ball, the kickback per stage. A save you can spend twice on
+## one ball is not a save, it is a wall.
+var _post_used := false
+var _kickback_used := false
 var _drop_targets: Array[Target] = []
 var _rollovers: Array[Sensor] = []
 var _left_flipper: Flipper
@@ -225,7 +249,10 @@ func _build_sensors() -> void:
 
 
 func _build_post() -> void:
-	if not Run.has_mod("post_rubber"):
+	# The mod bolts the post on for the whole run. The Post Save coil raises the
+	# same piece of geometry for one ball at a time, so the body is always built
+	# when either is owned and `_post.disabled` is what differs.
+	if not Run.has_mod("post_rubber") and not Run.has_coil("post_save"):
 		return
 	# Sits below the flipper tips, not between them: at 18px the drain gap is
 	# barely two ball widths, so a post up there would wall it off completely
@@ -243,6 +270,11 @@ func _build_post() -> void:
 	cs.shape = circle
 	post.add_child(cs)
 	add_child(post)
+	_post = post
+	_post_collision = cs
+	# With the mod it stands permanently. As a coil it starts down and rises
+	# once, when a ball is about to be lost.
+	_set_post_up(Run.has_mod("post_rubber"))
 
 
 ## The plunger lane's one-way gate.
@@ -327,6 +359,12 @@ func _build_fog() -> void:
 # --- Balls --------------------------------------------------------------------
 
 
+## Called when a new stage starts, not a new ball: the Kickback is a once-a-
+## stage save and must not come back with every serve.
+func reset_stage_saves() -> void:
+	_kickback_used = false
+
+
 func serve_ball() -> void:
 	for b in balls:
 		if is_instance_valid(b):
@@ -337,6 +375,10 @@ func serve_ball() -> void:
 		t.reset_target()
 	for r in _rollovers:
 		r.unlight()
+	# The post is per ball; the kickback is per stage and is reset by
+	# `reset_stage_saves()` instead.
+	_post_used = false
+	_set_post_up(Run.has_mod("post_rubber"))
 	# The type is decided here, before the body exists, which is what makes a
 	# ball's size safe to vary at all.
 	Run.take_next_ball()
@@ -383,6 +425,8 @@ func _physics_process(delta: float) -> void:
 	_track_balls()
 	_catch_escapees()
 	_apply_bumper_gravity(delta)
+	_apply_dead_bounce()
+	_update_post_save(delta)
 	if Run.effect_active("wormhole"):
 		_portal_t += delta
 		queue_redraw()
@@ -407,6 +451,80 @@ func _track_balls() -> void:
 				break
 		if in_outlane:
 			b.set_meta("via_outlane", true)
+
+
+func _set_post_up(up: bool) -> void:
+	if _post_collision == null:
+		return
+	# Deferred: this can be reached from inside the physics server's query
+	# flush, which refuses to have collision shapes switched under it.
+	_post_collision.set_deferred("disabled", not up)
+	if _post != null:
+		_post.visible = up
+
+
+## "Post Save": raises the centre post as a ball drops towards the drain, once
+## per ball. It saves a ball headed straight down the middle -- the one loss a
+## player can do least about -- and nothing else.
+func _update_post_save(_delta: float) -> void:
+	if not Run.has_coil("post_save") or _post_used or Run.has_mod("post_rubber"):
+		return
+	for b in balls:
+		if not is_instance_valid(b) or b.in_plunger_lane:
+			continue
+		if b.position.y < POST_ARM_Y or b.linear_velocity.y <= 0.0:
+			continue
+		if absf(b.position.x - TableLayout.LOWER_CENTRE) > POST_ARM_WIDTH:
+			continue
+		_post_used = true
+		_set_post_up(true)
+		Sfx.play("target")
+		Run.toast.emit("POST SAVE")
+		return
+
+
+## "Dead Bounce": kicks a ball off a *lowered* flipper instead of letting it die
+## there.
+##
+## Without the coil that ball is simply lost. Measured on the bare table, one
+## dropped just above the left flipper rolls off and drains 1.03 seconds later,
+## and nothing the player presses in that second saves it -- flipping does not
+## catch it, because the bat sweeps out from underneath.
+##
+## This is a *contact* event, not a resting state, and the first version of it
+## got that wrong: it waited for the ball to slow below 90px/s, which never
+## happens. The ball lands on the bat at around 120px/s and only accelerates as
+## it rolls off, so the coil did nothing at all and the drain simply happened
+## 0.09s later.
+func _apply_dead_bounce() -> void:
+	if not Run.has_coil("dead_bounce"):
+		return
+	var now := float(Time.get_ticks_msec())
+	for b in balls:
+		if not is_instance_valid(b) or b.in_plunger_lane:
+			continue
+		# Falling only. A ball already on its way up has been dealt with, and
+		# kicking it again is how a save becomes a trampoline.
+		if b.linear_velocity.y <= 0.0:
+			continue
+		if now < float(b.get_meta("dead_bounce_until", 0.0)):
+			continue
+		for flipper: Flipper in [_left_flipper, _right_flipper]:
+			if flipper == null or not flipper.is_resting():
+				continue
+			# Distance to the bat itself rather than to its pivot, so a ball
+			# beside the flipper root -- which is the drain, not the bat -- is
+			# not rescued by something it never touched.
+			var closest := Geometry2D.get_closest_point_to_segment(
+				b.position, flipper.position, flipper.tip())
+			if b.position.distance_to(closest) > DEAD_BOUNCE_REACH:
+				continue
+			if b.position.y > closest.y:  # under the bat, not resting on it
+				continue
+			b.linear_velocity = flipper.dead_bounce_impulse()
+			b.set_meta("dead_bounce_until", now + DEAD_BOUNCE_COOLDOWN_MS)
+			Sfx.play("sling")
+			break
 
 
 ## Pulls the ball towards the bumper cluster while Bumper Gravity is running.
@@ -450,6 +568,19 @@ func _catch_escapees() -> void:
 ## whole consumable -- for thirty seconds the bottom of the table stops being
 ## the end of the ball.
 func _retire_ball(b: Ball, via_outlane: bool) -> void:
+	# Checked before the Wormhole, because a kickback puts the ball back into
+	# *play* while the wormhole only puts it back in the lane. Given both, the
+	# one that keeps the ball moving is the better outcome for the player.
+	if (via_outlane and Run.has_coil("kickback") and not _kickback_used
+			and is_instance_valid(b) and b.position.x < TableLayout.LOWER_CENTRE):
+		_kickback_used = true
+		b.position = Vector2(TableLayout.OUTLANE_WIDTH * 0.5, 300.0)
+		b.linear_velocity = Vector2(0.0, -KICKBACK_SPEED)
+		b.angular_velocity = 0.0
+		b.set_meta("via_outlane", false)
+		Sfx.play("plunge")
+		Run.toast.emit("KICKBACK")
+		return
 	if Run.effect_active("wormhole") and is_instance_valid(b):
 		b.position = TableLayout.BALL_REST
 		b.linear_velocity = Vector2.ZERO

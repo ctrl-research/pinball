@@ -24,7 +24,7 @@ signal sold(kind: String, index: int)
 ## wrapped second line costs more room than the tail of "Outlane Insurance" is
 ## worth.
 const SLOT_GAP := 3.0
-const SLOT_PAD := 5.0
+const SLOT_PAD := 3.0
 
 
 static func slot_h() -> float:
@@ -48,12 +48,18 @@ const PIP_RADIUS := 4.0
 const PIP_PITCH := 12.0
 
 const FEVER_COLOUR := Color(1.0, 0.45, 0.55)
+## Coils are hardware, so they take the rail colour rather than a score colour.
+const COIL_COLOUR := Color(0.62, 0.66, 0.82)
 const RED := Color(0.94, 0.36, 0.40)
 const PANEL_BG := Color(0.055, 0.052, 0.082)
 const PANEL_EDGE := Color(0.15, 0.15, 0.22)
 const EMPTY_SLOT := Color(0.10, 0.10, 0.16)
 const FULL_SLOT := Color(0.16, 0.14, 0.23)
 const CONSUMABLE_SLOT := Color(0.12, 0.18, 0.20)
+## A running consumable lights its own slot, which is where the ACTIVE list used
+## to be: one row per item rather than the same item named in two places.
+const ACTIVE_SLOT := Color(0.10, 0.30, 0.32)
+const ACTIVE_COLOUR := Color(0.75, 1.0, 1.0)
 
 var _root: Control
 var _type: TextScreen
@@ -76,7 +82,8 @@ var _toast_label: Label
 var _progress: ColorRect
 var _slots: Array[Control] = []
 var _consumable_slots: Array[Control] = []
-var _active_labels: Array[Label] = []
+var _coil_labels: Array[Label] = []
+var _slot_last_id := {}
 
 var _overlay: Control
 var _overlay_title: Label
@@ -89,7 +96,7 @@ func _ready() -> void:
 	_build()
 	for s in [Run.score_changed, Run.mult_changed, Run.trinkets_changed,
 			Run.consumables_changed, Run.balls_changed, Run.tokens_changed,
-			Run.stage_changed, Run.nudges_changed]:
+			Run.stage_changed, Run.nudges_changed, Run.coils_changed]:
 		s.connect(_refresh)
 	_refresh()
 
@@ -112,16 +119,9 @@ func _process(delta: float) -> void:
 	_fever_bar.size.x = (Cabinet.PANEL_RIGHT.size.x - 8.0) * clampf(
 		Run.fever_remaining() / Run.FEVER_WINDOW, 0.0, 1.0)
 
-	var row := 0
-	for id in Run.effects:
-		if row >= _active_labels.size():
-			break
-		_active_labels[row].text = "%s  %ds" % [
-			str(Catalog.CONSUMABLES[id]["name"]).to_upper(),
-			int(ceil(Run.effect_remaining(id)))]
-		row += 1
-	for i in range(row, _active_labels.size()):
-		_active_labels[i].text = ""
+	for i in _coil_labels.size():
+		_coil_labels[i].text = ("- " + str(Catalog.COILS[Run.coils[i]]["name"]).to_upper()
+			if i < Run.coils.size() else "")
 
 
 func _input(event: InputEvent) -> void:
@@ -215,11 +215,15 @@ func _build_left() -> void:
 		_consumable_slots.append(_slot(Vector2(x, y), w, consumable_h()))
 		y += consumable_h() + SLOT_GAP
 
+	# Coils sit between what you own and what is running, because that is what
+	# they are: bought once like a trinket, but felt in the hand like an effect.
+	# One line each rather than a slot box -- there are at most three and they
+	# never change mid-ball, so they do not need the room a slot takes.
 	y += 5.0
-	_label("ACTIVE", Vector2(x, y), w, 8, DIM)
+	_label("COILS", Vector2(x, y), w, 8, DIM)
 	y += lh(8)
-	for i in Run.MAX_CONSUMABLES:
-		_active_labels.append(_label("", Vector2(x, y), w, 8, Color(0.55, 0.90, 0.95)))
+	for i in Run.MAX_COILS:
+		_coil_labels.append(_label("", Vector2(x, y), w, 8, COIL_COLOUR))
 		y += lh(8, 1.0)
 
 	# Pinned to the bottom of the panel rather than following the cursor: MULT
@@ -456,17 +460,34 @@ func _refresh() -> void:
 
 	for i in _consumable_slots.size():
 		var text := _consumable_slots[i].get_child(0) as Label
+		var id: String = str(Run.consumables[i])
+		# A slot remembers what it last held while that effect is still running,
+		# so using your last Slow Ball does not make its countdown vanish. The
+		# shop is the only place inventory changes, so within a stage a slot's
+		# identity is stable and this cannot show the wrong name.
+		if id != "":
+			_slot_last_id[i] = id
+		var showing: String = id if id != "" else str(_slot_last_id.get(i, ""))
+		var running := showing != "" and Run.effect_active(showing)
+
 		# The number is the keybind. A slot that does not say which key fires it
 		# is a mechanic the player has to be told about out of band.
-		if Run.consumables[i] != "":
-			var def: Dictionary = Catalog.CONSUMABLES[Run.consumables[i]]
+		if id != "" or running:
+			var def: Dictionary = Catalog.CONSUMABLES[showing]
 			# The count is only shown when there is more than one; "x1" on every
 			# slot is noise that makes a real stack harder to spot.
-			var n: int = Run.consumable_stacks[i]
-			text.text = "%d  %s%s" % [
-				i + 1, str(def["name"]).to_upper(), "" if n <= 1 else "  x%d" % n]
-			text.add_theme_color_override("font_color", Color(0.55, 0.90, 0.95))
-			_consumable_slots[i].color = CONSUMABLE_SLOT
+			var n: int = Run.consumable_stacks[i] if id != "" else 0
+			var tail := ""
+			if running:
+				# The timer wins the space: it is the only part of this row that
+				# is changing, and the only part worth a glance mid-ball.
+				tail = "  %ds" % int(ceil(Run.effect_remaining(showing)))
+			elif n > 1:
+				tail = "  x%d" % n
+			text.text = "%d  %s%s" % [i + 1, str(def["name"]).to_upper(), tail]
+			text.add_theme_color_override("font_color",
+				ACTIVE_COLOUR if running else Color(0.55, 0.90, 0.95))
+			_consumable_slots[i].color = ACTIVE_SLOT if running else CONSUMABLE_SLOT
 		else:
 			text.text = "%d  --" % (i + 1)
 			text.add_theme_color_override("font_color", DIM)
@@ -563,52 +584,117 @@ func show_cleared(payout: Array) -> void:
 ## The inventory being *in* the shop is the point. Selling is only a real
 ## decision if you can see the thing you would be giving up next to the thing
 ## you would be buying with it -- a sell button somewhere else is just a refund.
+## Tabs over the inventory, not over the whole shop.
+##
+## The shelf is what the player is deciding about, so it stays on screen at all
+## times; the rack is what grew too big for the screen. Three columns held four
+## categories and no more -- coils were the fifth, and a fifth column would have
+## put NEXT BLIND off the bottom again. Tabs are the only arrangement here that
+## survives a sixth.
+const SHOP_TABS := ["TRINKETS", "CONSUMABLES", "BALLS", "COILS"]
+
+var _shop_offers: Array = []
+var _shop_tab := 0
+
+
 func show_shop(offers: Array) -> void:
+	_shop_offers = offers
+	_shop_tab = 0
+	_build_shop(false)
+
+
+func _build_shop(from_tab: bool) -> void:
 	_refresh()
 	_open("SHOP     $%d" % Run.tokens, [])
 
-	# Three columns rather than two. The inventory is thirteen rows at a full
-	# rack -- five trinkets, three consumables, five balls -- and stacked in one
-	# column at the current type size that ran the NEXT BLIND button off the
-	# bottom of the screen. Splitting the rack in two spends the empty
-	# horizontal space instead of the vertical space there is none of.
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 10)
+	columns.add_theme_constant_override("separation", 12)
 	_overlay_body.add_child(columns)
 
 	var buy_col := _shop_column(232.0)
 	columns.add_child(buy_col)
 	buy_col.add_child(_head("FOR SALE"))
-	if offers.is_empty():
+	if _shop_offers.is_empty():
 		buy_col.add_child(_body_line("Sold out.", DIM))
-	for i in offers.size():
-		buy_col.add_child(_offer_row(offers[i], i, 228.0))
+	for i in _shop_offers.size():
+		buy_col.add_child(_offer_row(_shop_offers[i], i, 228.0))
 
-	var held_col := _shop_column(156.0)
-	columns.add_child(held_col)
-	held_col.add_child(_head("TRINKETS  %d/%d" % [Run.trinkets.size(), Run.MAX_TRINKETS]))
-	if Run.trinkets.is_empty():
-		held_col.add_child(_body_line("none", DIM))
-	for i in Run.trinkets.size():
-		held_col.add_child(_sell_button("trinket", Run.trinkets[i], i))
+	var rack := _shop_column(300.0)
+	columns.add_child(rack)
 
-	held_col.add_child(_head("CONSUMABLES  %d/%d"
-		% [Run.consumable_count(), Run.MAX_CONSUMABLES]))
-	if Run.consumable_count() == 0:
-		held_col.add_child(_body_line("none", DIM))
-	for i in Run.consumables.size():
-		# Index, not position: slot 2 sells slot 2 even if slot 1 is a hole.
-		if Run.consumables[i] != "":
-			held_col.add_child(_sell_button("consumable", Run.consumables[i], i))
+	var tab_row := HBoxContainer.new()
+	tab_row.add_theme_constant_override("separation", 4)
+	rack.add_child(tab_row)
+	var active_tab: Button = null
+	for i in SHOP_TABS.size():
+		var tab := Button.new()
+		tab.text = str(SHOP_TABS[i])
+		tab.add_theme_font_size_override("font_size", Style.pt(8))
+		tab.focus_mode = Control.FOCUS_ALL
+		if i == _shop_tab:
+			tab.add_theme_color_override("font_color", GOLD)
+			active_tab = tab
+		else:
+			tab.add_theme_color_override("font_color", DIM)
+		tab.pressed.connect(_on_shop_tab.bind(i))
+		tab_row.add_child(tab)
 
-	var ball_col := _shop_column(156.0)
-	columns.add_child(ball_col)
-	ball_col.add_child(_head("BALLS  %d/%d" % [_owned_balls(), Run.BALL_SLOTS]))
-	for i in Run.ball_slots.size():
-		ball_col.add_child(_ball_slot_row(i))
+	match _shop_tab:
+		0:
+			_rack_trinkets(rack)
+		1:
+			_rack_consumables(rack)
+		2:
+			_rack_balls(rack)
+		_:
+			_rack_coils(rack)
 
 	_overlay_body.add_child(_body_line("Click to buy or sell.", DIM))
 	_add_continue("NEXT BLIND")
+
+	# Focus stays on the tab the player just pressed rather than jumping to the
+	# continue button. Without this, clicking a tab and then pressing space
+	# leaves the shop entirely -- which reads as the tab having ended the round.
+	if from_tab and active_tab != null:
+		active_tab.grab_focus.call_deferred()
+
+
+func _on_shop_tab(index: int) -> void:
+	_shop_tab = index
+	_build_shop(true)
+
+
+func _rack_trinkets(rack: VBoxContainer) -> void:
+	rack.add_child(_head("TRINKETS  %d/%d" % [Run.trinkets.size(), Run.MAX_TRINKETS]))
+	if Run.trinkets.is_empty():
+		rack.add_child(_body_line("none", DIM))
+	for i in Run.trinkets.size():
+		rack.add_child(_sell_button("trinket", Run.trinkets[i], i))
+
+
+func _rack_consumables(rack: VBoxContainer) -> void:
+	rack.add_child(_head("CONSUMABLES  %d/%d"
+		% [Run.consumable_count(), Run.MAX_CONSUMABLES]))
+	if Run.consumable_count() == 0:
+		rack.add_child(_body_line("none", DIM))
+	for i in Run.consumables.size():
+		# Index, not position: slot 2 sells slot 2 even if slot 1 is a hole.
+		if Run.consumables[i] != "":
+			rack.add_child(_sell_button("consumable", Run.consumables[i], i))
+
+
+func _rack_balls(rack: VBoxContainer) -> void:
+	rack.add_child(_head("BALLS  %d/%d" % [_owned_balls(), Run.BALL_SLOTS]))
+	for i in Run.ball_slots.size():
+		rack.add_child(_ball_slot_row(i))
+
+
+func _rack_coils(rack: VBoxContainer) -> void:
+	rack.add_child(_head("COILS  %d/%d" % [Run.coils.size(), Run.MAX_COILS]))
+	if Run.coils.is_empty():
+		rack.add_child(_body_line("none", DIM))
+	for i in Run.coils.size():
+		rack.add_child(_sell_button("coil", Run.coils[i], i))
 
 
 func _shop_column(width: float) -> VBoxContainer:
@@ -640,7 +726,7 @@ func _ball_slot_row(index: int) -> Control:
 	b.add_theme_font_size_override("font_size", Style.pt(8))
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.clip_text = true
-	b.custom_minimum_size = Vector2(152.0, 0.0)
+	b.custom_minimum_size = Vector2(296.0, 0.0)
 	var name := str(def["name"])
 	if lvl > 1:
 		name += " Lv%d" % lvl
@@ -699,12 +785,24 @@ func _offer_row(offer: Dictionary, index: int, width: float) -> Control:
 
 
 func _sell_button(kind: String, id: String, index: int) -> Button:
-	var def: Dictionary = Catalog.TRINKETS[id] if kind == "trinket" else Catalog.CONSUMABLES[id]
+	# A match rather than an assignment with branches after it: the default has
+	# to be *chosen*, not evaluated first and then corrected. Written the other
+	# way, `Catalog.TRINKETS[id]` runs before the branch and throws on every
+	# coil id -- which it did, and which every test still passed, because a
+	# GDScript error at runtime prints and carries on.
+	var def: Dictionary = {}
+	match kind:
+		"consumable":
+			def = Catalog.CONSUMABLES[id]
+		"coil":
+			def = Catalog.COILS[id]
+		_:
+			def = Catalog.TRINKETS[id]
 	var b := Button.new()
 	b.add_theme_font_size_override("font_size", Style.pt(8))
 	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	b.clip_text = true
-	b.custom_minimum_size = Vector2(152.0, 0.0)
+	b.custom_minimum_size = Vector2(296.0, 0.0)
 	var label := str(def["name"])
 	if kind == "consumable" and Run.consumable_stacks[index] > 1:
 		# Says "one" because a click sells one off the stack, not the lot.

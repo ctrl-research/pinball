@@ -104,10 +104,19 @@ func _test_on_screen() -> void:
 		Run.add_consumable(id)
 	for i in Run.BALL_SLOTS:
 		Run.ball_slots[i] = "gold"
+	Run.coils.clear()
+	for id in ["hot_winding", "heavy_bat", "dead_bounce"]:
+		Run.add_coil(id)
 
 	var screen := Rect2(Vector2.ZERO, Vector2(TextScreen.RESOLUTION))
+	# Every tab, not just the one the shop opens on: each holds a different
+	# number of rows, and it is the tallest that decides whether the button
+	# fits.
 	var screens := {
-		"shop": func() -> void: _game._enter_shop(),
+		"shop tab 0": func() -> void: _game._enter_shop(),
+		"shop tab 1": func() -> void: _game.hud._on_shop_tab(1),
+		"shop tab 2": func() -> void: _game.hud._on_shop_tab(2),
+		"shop tab 3": func() -> void: _game.hud._on_shop_tab(3),
 		"intro": func() -> void: _game.hud.show_intro(),
 		"cleared": func() -> void: _game.hud.show_cleared(Run.stage_payout()),
 		"defeat": func() -> void: _game.hud.show_lost(),

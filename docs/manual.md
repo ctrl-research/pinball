@@ -247,6 +247,35 @@ nothing on the stages where you draw a Vanilla.
 
 ---
 
+## Coils
+
+Upgrades to the flippers and the machinery around them — up to **3** at a time.
+A coil never adds a point. Every other category makes a good ball worth more;
+coils make good balls more likely.
+
+<!-- BEGIN GENERATED: coils -->
+| Coil | Effect | Buy | Sell |
+| --- | --- | --- | --- |
+| Heavy Bat | Harder shots, and less control of them | $6 | $4 |
+| Hot Winding | Flippers sweep 20% faster | $6 | $4 |
+| Dead Bounce | A ball landing on a resting flipper bounces up | $8 | $6 |
+| Post Save | A centre post rises once per ball | $8 | $6 |
+| Kickback | The left outlane fires the ball back, once a stage | $9 | $6 |
+<!-- END GENERATED: coils -->
+
+They are held like trinkets rather than slotted like balls: there is no such
+thing as an empty coil, so selling one closes the list up.
+
+**Heavy Bat is not a straight upgrade.** More speed off the bat is more scoring
+and less control of where the ball goes, and a machine wearing it *and* Hot
+Winding is genuinely harder to hold. That is deliberate — a category where
+everything is an improvement is a shopping list, not a choice.
+
+Two of them are one-use saves, and they differ in what brings them back:
+**Post Save** rearms with every ball, **Kickback** only once a stage.
+
+---
+
 ## Table mods
 
 Permanent changes to the physical playfield — the one modifier layer that alters
@@ -293,6 +322,7 @@ entirely on one axis meets a wall.
 | Consumables per slot | 5 |
 | Balls per stage | 3 |
 | Ball slots | 5 |
+| Coil slots | 3 |
 | Ball upgrade | $5, +$2 per level owned |
 | Fever: contacts per level | 5 |
 | Fever: per level | +0.25x |

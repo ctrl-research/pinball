@@ -78,6 +78,11 @@ def build(data):
           "-" if not b["cost"] else "$%d" % b["cost"],
           "-" if not b["cost"] else "$%d" % b["sell"]) for b in balls])
 
+    blocks["coils"] = table(
+        ["Coil", "Effect", "Buy", "Sell"],
+        [(c["name"], c["desc"], "$%d" % c["cost"], "$%d" % c["sell"])
+         for c in sorted(data["coils"], key=lambda c: (c["cost"], c["name"]))])
+
     blocks["bosses"] = table(
         ["Boss blind", "Effect"],
         [(b["name"], b["desc"]) for b in data["bosses"]])
@@ -101,6 +106,7 @@ def build(data):
             ("Consumables per slot", lim["stack"]),
             ("Balls per stage", lim["balls"]),
             ("Ball slots", lim["ball_slots"]),
+            ("Coil slots", lim["coils"]),
             ("Ball upgrade", "$%d, +$%d per level owned"
                 % (lim["ball_upgrade"], lim["ball_upgrade_step"])),
             ("Fever: contacts per level", lim["fever_hits"]),

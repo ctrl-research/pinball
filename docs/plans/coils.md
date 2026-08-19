@@ -1,6 +1,6 @@
 # Plan — Coils (flipper powerups)
 
-Status: **not started**. Design lives in
+Status: **built**, except Phase C (`Second Coil`). Design lives in
 [`game-design.md`](../game-design.md#coils-flipper-powerups); this is the
 implementation plan and it revises that design where the table disagreed with it.
 
@@ -49,7 +49,7 @@ will fail that gate.
 This has to be settled before any coil exists, because it decides what the shop
 code looks like:
 
-- **(a) Tabs** — `HELD` / `BUY`, or one tab per category. Most room, most new UI.
+- **(a) Tabs** — `HELD` / `BUY`, or one tab per category. Most room, most new UI. **← chosen**
 - **(b) Scroll the inventory column** — a `ScrollContainer`; cheap, but a
   scrollbar in a pixel-art cabinet needs styling and hides items by default.
 - **(c) Pair coils with balls in one column** — both are "the hardware", both
@@ -57,9 +57,11 @@ code looks like:
 - **(d) Drop a category from the shop screen** — e.g. move table mods to a
   separate between-ante screen, since they are bought rarely.
 
-**Recommendation: (a) tabs.** It is the only one that still works when a sixth
-category appears, and this is now the second time in three features that the
-shop has run out of room.
+**Chosen: (a) tabs**, over the inventory only. The shelf is what the player is
+deciding about so it stays on screen; the rack is what grew too big. Tabs are
+the only arrangement that survives a sixth category, and `click_test` now checks
+that *every* tab keeps the NEXT BLIND button on screen, not just the one the
+shop opens on.
 
 ---
 

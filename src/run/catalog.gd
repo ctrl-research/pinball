@@ -254,6 +254,34 @@ static func ball_sell_price(id: String, level: int) -> int:
 	return int(floor(float(ball_total_cost(id, level)) * SELL_FRACTION))
 
 
+# --- Coils ---------------------------------------------------------------------
+
+## Upgrades to the flippers and the machinery around them: the survival axis.
+##
+## A coil never adds a point. Every other layer makes a good ball worth more;
+## these make good balls more likely, and that tension is the build decision.
+##
+## Deliberately not all upgrades. `Heavy Bat` is double-edged on purpose -- more
+## speed is more scoring and less control -- because a category where every item
+## is a straight improvement is a shopping list rather than a choice.
+const COILS := {
+	"hot_winding": {
+		"name": "Hot Winding", "desc": "Flippers sweep 20% faster", "cost": 6,
+	},
+	"heavy_bat": {
+		"name": "Heavy Bat", "desc": "Harder shots, and less control of them", "cost": 6,
+	},
+	"dead_bounce": {
+		"name": "Dead Bounce", "desc": "A ball landing on a resting flipper bounces up", "cost": 8,
+	},
+	"post_save": {
+		"name": "Post Save", "desc": "A centre post rises once per ball", "cost": 8,
+	},
+	"kickback": {
+		"name": "Kickback", "desc": "The left outlane fires the ball back, once a stage", "cost": 9,
+	},
+}
+
 # --- Table mods ---------------------------------------------------------------
 
 ## Permanent changes to the physical playfield -- the roguelike lever pinball
@@ -296,6 +324,8 @@ static func sell_price(kind: String, id: String) -> int:
 		table = CONSUMABLES
 	elif kind == "ball":
 		table = BALLS
+	elif kind == "coil":
+		table = COILS
 	if not table.has(id):
 		return 0
 	return int(floor(float(table[id]["cost"]) * SELL_FRACTION))
