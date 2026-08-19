@@ -7,11 +7,18 @@ extends CanvasLayer
 
 const TOGGLE_ACTION := "toggle_crt"
 
+## Emitted so the UI's own pass in `text_screen.gd` can follow the same switch.
+## F1 is there for anyone who finds the effect costs them legibility, and the
+## text pass is the harder of the two -- leaving it running when the screen pass
+## is off would turn the switch off for the wrong half of the game.
+signal toggled(on: bool)
+
 var enabled := true:
 	set(value):
 		enabled = value
 		if _screen != null:
 			_screen.visible = value
+		toggled.emit(value)
 
 var _screen: ColorRect
 

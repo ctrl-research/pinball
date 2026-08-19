@@ -14,42 +14,27 @@ render_mode unshaded;
 // thing the player actually needs.
 uniform sampler2D screen_tex : hint_screen_texture, repeat_disable, filter_linear;
 
-uniform float curvature : hint_range(0.0, 0.3) = 0.045;
-uniform float scanline_strength : hint_range(0.0, 1.0) = 0.18;
+uniform float curvature : hint_range(0.0, 0.3) = 0.058;
+uniform float scanline_strength : hint_range(0.0, 1.0) = 0.26;
 // Tied to the 360px design height, not the physical resolution, so the lines
 // scale with the game and a bigger window does not mean finer scanlines.
 uniform float scanline_count = 360.0;
-uniform float mask_strength : hint_range(0.0, 0.5) = 0.07;
-uniform float aberration : hint_range(0.0, 0.01) = 0.0012;
-uniform float vignette : hint_range(0.0, 1.0) = 0.22;
-uniform float gain : hint_range(0.5, 2.0) = 1.16;
+uniform float mask_strength : hint_range(0.0, 0.5) = 0.12;
+uniform float aberration : hint_range(0.0, 0.01) = 0.0018;
+uniform float vignette : hint_range(0.0, 1.0) = 0.28;
+uniform float gain : hint_range(0.5, 2.0) = 1.30;
 
-// Signal wobble. A tube never held a perfectly straight line, and a slow lateral
-// wave is the cheapest way to say "this is being transmitted, not drawn".
-//
-// Two waves, not one, and that is the whole trick.
-//
-// A single wave displaces the entire frame together, and a frame that moves as
-// one rigid thing is invisible no matter how far it moves -- there is nothing
-// to see it against. The first version was exactly that, and at a pixel of
-// amplitude it may as well not have been running.
-//
-// The second wave is much higher-frequency, so neighbouring scanlines shift by
-// *different* amounts. That is relative motion, and relative motion is what the
-// eye actually reads as wobble. It can therefore stay small enough not to smear
-// 8px text while being clearly visible on it.
-uniform float wave_amount : hint_range(0.0, 0.01) = 0.0020;
-uniform float wave_speed : hint_range(0.0, 8.0) = 1.5;
-uniform float wave_freq : hint_range(0.0, 40.0) = 5.0;
-uniform float ripple_amount : hint_range(0.0, 0.005) = 0.0009;
-uniform float ripple_speed : hint_range(0.0, 20.0) = 6.0;
-uniform float ripple_freq : hint_range(0.0, 400.0) = 130.0;
+// There is deliberately no signal wobble here. It used to live in this shader,
+// and it could not work: this pass runs over the finished frame, so displacing
+// the picture displaces the cabinet and the ball along with the readouts. The
+// wobble now runs over the UI's own viewport in `text_crt.gdshader`, where it
+// can move the type while the machine stays still.
 
 // Phosphor glow. This is the part that actually reads on text: a CRT's beam
 // blooms into its neighbours, so bright glyphs bleed a halo and thin strokes
 // look thicker and softer than the geometry says. Without it, text under
 // scanlines just looks like text with lines drawn over it.
-uniform float glow_strength : hint_range(0.0, 1.5) = 0.42;
+uniform float glow_strength : hint_range(0.0, 1.5) = 0.55;
 uniform float glow_spread : hint_range(0.0, 4.0) = 1.5;
 // Only things already bright bloom, so the dark playfield stays dark instead of
 // the whole picture lifting into grey.
@@ -87,12 +72,6 @@ vec3 phosphor(vec2 uv) {
 
 void fragment() {
 	vec2 uv = curve(SCREEN_UV);
-
-	// Applied after the curve so the wobble rides on top of the glass rather
-	// than fighting it. The slow wave carries the whole frame; the fast ripple
-	// is what makes it legible as motion.
-	uv.x += sin(uv.y * wave_freq + TIME * wave_speed) * wave_amount;
-	uv.x += sin(uv.y * ripple_freq + TIME * ripple_speed) * ripple_amount;
 
 	// Outside the curved glass is the inside of the bezel, not the game.
 	if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {

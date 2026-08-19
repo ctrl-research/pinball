@@ -594,6 +594,39 @@ inserts, a segmented-LED score readout on the panel.
   is the mildest setting of all, because it sits on top of the playfield's own
   perspective warp and two distortions arguing with each other look like a bug.
 
+- **The UI has a second, harder pass of its own.** All type is hosted in
+  `src/ui/text_screen.gd` — a `SubViewportContainer` that renders the UI at the
+  native 640×360 and upscales it with nearest-neighbour — and put through
+  `src/ui/text_crt.gdshader`, which carries the scanlines, the phosphor bloom
+  and the signal wobble at strengths the full-screen pass cannot use.
+
+  The split exists because a screen-space pass **cannot** wobble text. By the
+  time the frame reaches the CRT shader the glyphs are baked into it next to the
+  ball, so displacing anything displaces everything: a frame that moves as one
+  rigid piece is invisible, because nothing is left standing still to see it
+  against, and raising the amplitude until it *is* visible makes the cabinet
+  swim. Two versions of this shipped before the layer split, and both were wrong
+  in one of those two ways.
+
+  It also puts the type back on the pixel grid. Godot's `canvas_items` stretch
+  rasterises fonts at the *scaled* size, so a 1280×720 window drew 8pt text as
+  smooth 16px glyphs — sharp, but not made of the same pixels as the rest of the
+  game. Going through a native-resolution viewport fixes that, and the wobble
+  quantises to whole pixels as a side effect, which is what a weak analogue
+  signal actually looks like.
+
+  The cost is that the UI now has to *forward* input rather than receive it, and
+  the shop's rows are the only part of the game reachable by mouse alone.
+  `tests/click_test.gd` sends a real click at real window coordinates and checks
+  the money moved, because a shop that stops taking clicks passes every other
+  gate in the suite.
+
+  **F1 turns both passes off together.** The switch exists for anyone the effect
+  costs legibility, and the text pass is the harder of the two — leaving it on
+  would be turning the switch off for the wrong half of the game. The
+  native-resolution render stays either way: that is the game's pixel grid, not
+  an effect laid over it.
+
 - **The type is pixel type.** Jersey 25 (SIL OFL 1.1) is the project-wide
   default, set once on the theme in `src/autoload/style.gd` rather than as an
   override on every label — nothing in the UI asks for a font by name, only for
