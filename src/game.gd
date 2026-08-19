@@ -42,6 +42,8 @@ func _ready() -> void:
 
 
 func _enter_intro() -> void:
+	# A new stage, so the once-a-stage saves come back.
+	table.reset_stage_saves()
 	state = State.INTRO
 	table.active = false
 	table.build()
@@ -146,7 +148,14 @@ func _on_bought(index: int) -> void:
 func _on_sold(kind: String, index: int) -> void:
 	if state != State.SHOP:
 		return
-	var paid := Run.sell_ball(index) if kind == "ball" else Run.sell(kind, index)
+	var paid := 0
+	match kind:
+		"ball":
+			paid = Run.sell_ball(index)
+		"coil":
+			paid = Run.sell_coil(index)
+		_:
+			paid = Run.sell(kind, index)
 	if paid > 0:
 		Sfx.play("buy")
 		# Rebuilt rather than patched: selling can re-enable a "FULL" offer, so

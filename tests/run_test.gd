@@ -16,7 +16,7 @@ var _failures := 0
 ## a failed typed assignment, say -- aborts that function without touching the
 ## failure count, so the suite would otherwise print OK having quietly skipped
 ## everything after the error. This is the check that caught exactly that.
-const SECTIONS := 16
+const SECTIONS := 17
 
 var _sections := 0
 
@@ -38,6 +38,7 @@ func _ready() -> void:
 	_fever()
 	_balls()
 	_summary()
+	_coils()
 
 	if _sections != SECTIONS:
 		_failures += 1
@@ -776,4 +777,78 @@ func _summary() -> void:
 	_eq(Run.best_stage_score, 0, "only a new run clears the best stage")
 	_eq(Run.best_chain, 0, "the best chain")
 	_eq(Run.ball_uses.size(), 0, "and the tally")
+	_sections += 1
+
+
+## Coils: the survival layer. Held like trinkets, capped lower, and the only
+## category whose effects live in the table rather than in the arithmetic --
+## which is why what is asserted here is ownership and money, and `flipper_test`
+## asserts what they actually do to a ball.
+func _coils() -> void:
+	Run.new_run(1090)
+	_eq(Run.coils.size(), 0, "a run starts with no coils")
+	_check(not Run.has_coil("hot_winding"), "and does not have one")
+
+	_check(Run.add_coil("hot_winding"), "a coil fits")
+	_check(Run.has_coil("hot_winding"), "and is held")
+	_check(not Run.add_coil("hot_winding"), "the same coil twice is refused")
+	_eq(Run.coils.size(), 1, "so it is still one")
+
+	_check(Run.add_coil("heavy_bat"), "a second fits")
+	_check(Run.add_coil("dead_bounce"), "and a third")
+	_check(not Run.add_coil("kickback"), "but not a fourth")
+	_eq(Run.coils.size(), Run.MAX_COILS, "the rack holds three")
+
+	# Selling closes the list up, like trinkets and unlike ball slots -- there
+	# is no such thing as an empty coil.
+	Run.tokens = 0
+	_eq(Run.sell_coil(0), Catalog.sell_price("coil", "hot_winding"), "selling pays out")
+	_eq(Run.coils.size(), 2, "and the list closes up")
+	_check(not Run.has_coil("hot_winding"), "the coil is gone")
+	_eq(Run.coils[0], "heavy_bat", "and the rest shuffle down")
+	_eq(Run.sell_coil(9), 0, "selling a slot that is not there pays nothing")
+
+	# can_take guards both the cap and the duplicate, so the shop greys the
+	# button out rather than taking the money.
+	Run.new_run(1091)
+	var offer := {"kind": "coil", "id": "kickback", "cost": 9}
+	_check(Run.can_take(offer), "an empty rack can take a coil")
+	Run.add_coil("kickback")
+	_check(not Run.can_take(offer), "but not the one it already holds")
+	Run.add_coil("hot_winding")
+	Run.add_coil("heavy_bat")
+	_check(not Run.can_take({"kind": "coil", "id": "post_save", "cost": 8}),
+		"and a full rack takes nothing")
+
+	# Buying goes through the same path the shop uses.
+	Run.new_run(1092)
+	Run.tokens = 20
+	_check(Run.buy({"kind": "coil", "id": "post_save", "cost": 8}), "a coil can be bought")
+	_eq(Run.tokens, 12, "and is paid for")
+	_check(Run.has_coil("post_save"), "and arrives")
+
+	# Coils reach the shelf, and a held one is never offered again.
+	Run.new_run(1093)
+	var seen := false
+	for i in 200:
+		for shop_offer in Run.roll_shop():
+			if str(shop_offer["kind"]) == "coil":
+				seen = true
+	_check(seen, "coils are offered")
+
+	Run.new_run(1094)
+	Run.add_coil("kickback")
+	for i in 200:
+		for shop_offer in Run.roll_shop():
+			if str(shop_offer["kind"]) == "coil":
+				_check(str(shop_offer["id"]) != "kickback",
+					"a coil already held is not offered again")
+
+	# Run-scoped: a new run clears them, a new stage does not.
+	Run.new_run(1095)
+	Run.add_coil("dead_bounce")
+	Run.begin_stage()
+	_check(Run.has_coil("dead_bounce"), "a coil survives the next stage")
+	Run.new_run(1096)
+	_eq(Run.coils.size(), 0, "and only a new run clears it")
 	_sections += 1

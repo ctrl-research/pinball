@@ -72,6 +72,15 @@ jobs:
           ./godot --headless --path . --quit-after 3000 tests/inlane_test.tscn 2>&1 | tee -a build.log
           grep -q "INLANE_TEST_OK" build.log
 
+      # What the flippers do to a ball, asserted against measurements. The coil
+      # layer was designed on two claims about them and one was false -- a held
+      # flipper already cradles -- so both are now pinned here.
+      - name: Flipper behaviour test
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . --quit-after 8000 tests/flipper_test.tscn 2>&1 | tee -a build.log
+          grep -q "FLIPPER_TEST_OK" build.log
+
       # The shop's buy and sell rows are the only part of the game that can be
       # reached solely with a mouse -- the sim taps space through every other
       # screen -- and they now sit inside a SubViewportContainer, which has to
