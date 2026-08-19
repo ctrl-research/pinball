@@ -664,6 +664,24 @@ inserts, a segmented-LED score readout on the panel.
   native-resolution render stays either way: that is the game's pixel grid, not
   an effect laid over it.
 
+- **Type scales from one number.** `Style.TEXT_SCALE` multiplies every font size
+  in the game, and sizes are written unscaled everywhere — read an `8` in the
+  layout as "the small size", not as a pixel count. It sits at **1.5×**: at 1.0
+  the smallest labels were 8 pixels tall, which is too few pixels to say a
+  letter with once the CRT pass has cut scanlines through them.
+
+  Raising it forced two structural changes, because the screen is a fixed
+  640×360 and there is nowhere for text to grow into. The side panels are laid
+  out with a running cursor and type-derived row heights rather than hardcoded
+  offsets, so a size change reflows them instead of overlapping them. The shop
+  went from two columns to three: a full rack is thirteen inventory rows, and
+  stacked in one column at 1.5× that pushed the NEXT BLIND button off the bottom
+  of the screen — an unfinishable run for anyone playing with a mouse.
+
+  The overlays grow by less than the panels (about 1.25×). They were already the
+  largest text in the game, they are the one place with genuinely variable
+  content, and they are what runs out of room first.
+
 - **The type is pixel type.** Jersey 25 (SIL OFL 1.1) is the project-wide
   default, set once on the theme in `src/autoload/style.gd` rather than as an
   override on every label — nothing in the UI asks for a font by name, only for

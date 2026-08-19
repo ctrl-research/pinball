@@ -42,7 +42,14 @@ uniform float ripple_freq : hint_range(0.0, 400.0) = 110.0;
 // --- Tube ---------------------------------------------------------------------
 
 uniform float scanline_strength : hint_range(0.0, 1.0) = 0.22;
-uniform float aberration : hint_range(0.0, 0.01) = 0.0009;
+// Off by default, and that is not timidity -- it is that this pass *cannot* do
+// it subtly. The layer is sampled nearest-neighbour, so a fringe offset either
+// rounds to zero or to a whole pixel; there is no in-between. A whole pixel of
+// red-blue split on a twelve-pixel glyph is not a hint of a badly converged
+// tube, it is a coloured outline around every letter, and it was the single
+// biggest thing making the small labels hard to read. The full-screen pass
+// still fringes, where it has a filtered image to do it on properly.
+uniform float aberration : hint_range(0.0, 0.01) = 0.0;
 uniform float gain : hint_range(0.5, 2.0) = 1.14;
 
 // Phosphor bloom. This is the effect that does most of the work on type: a real
