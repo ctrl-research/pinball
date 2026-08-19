@@ -144,8 +144,22 @@ A second multiplier, stacked on top of MULT rather than folded into it:
 score += value x MULT x FEVER
 ```
 
-Fever climbs by ×0.25 on every scoring contact, caps at ×5, and **falls all the
-way back to ×1 after two seconds without one**. MULT is the ball you have built
+Fever climbs one level per **five** scoring contacts, each level worth ×0.25, it
+caps at ×5, and it **falls all the way back to ×1 after two seconds without a
+contact** — taking any part-built level with it.
+
+A level per contact was the first version, and the number moved so constantly
+that it read as noise attached to the ball rather than as something being built:
+every contact bumped it, so no contact felt like it mattered. Five gives the
+meter a floor to climb and makes the level itself an event. The panel shows pips
+for the contacts banked so far, because a meter that only moves once every five
+hits looks broken unless something accounts for the four in between.
+
+The multipliers that "build fever twice as fast" — Combo Coil, the Ember ball —
+act on the *contacts needed*, not on the size of a level. A level is worth 0.25
+to everyone and what those buy is reaching it in three contacts instead of five.
+Doubling the step instead would have quietly raised the ceiling as well as the
+rate, which is two changes sold as one. MULT is the ball you have built
 over twenty seconds and lose on the drain; fever is the last two seconds.
 
 Two multipliers rather than one because they answer different questions and are
@@ -165,6 +179,21 @@ numbers that make the ante curve meaningless.
 `Combo Coil` was a trinket that granted +0.2 MULT on quick hits, which is the
 same problem fever solves. It now builds fever twice as fast instead — two
 systems for "you are hitting things quickly" is one more than a player can read.
+
+### The end-of-run summary
+
+A run is twenty-four stages long and the only thing a player otherwise carries
+out of it is whether they died. The defeat and victory screens report three
+numbers, chosen to be about the *player* rather than about the machine: the best
+single stage is what the build was worth at its peak, the longest combo is how
+well the flippers were played, and the most-used ball is what the run turned out
+to be made of.
+
+None of them feeds a rule, which is exactly why they are tested: nothing else in
+the suite would notice them quietly reporting the wrong story. The best stage is
+recorded as the score moves rather than when a stage ends, because a stage can
+end through defeat, victory or the last drain — hooking one of those means the
+other two are silently missing.
 
 ### Scoring
 
@@ -607,6 +636,14 @@ inserts, a segmented-LED score readout on the panel.
   against, and raising the amplitude until it *is* visible makes the cabinet
   swim. Two versions of this shipped before the layer split, and both were wrong
   in one of those two ways.
+
+  The amplitude is set so the two waves are about a third of a pixel each, and
+  only cross into a whole-pixel step when they peak together. Because the layer
+  is sampled nearest-neighbour there is no in-between: the type either sits
+  still or shifts by exactly one pixel, which reads as a signal that is *nearly*
+  locked rather than as text permanently swimming. Sub-pixel amplitudes are not
+  wasted here the way they would be on a smoothly filtered layer — they set how
+  *often* the step happens.
 
   It also puts the type back on the pixel grid. Godot's `canvas_items` stretch
   rasterises fonts at the *scaled* size, so a 1280×720 window drew 8pt text as

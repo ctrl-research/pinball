@@ -40,6 +40,20 @@ three — beating the target early does not end the stage, it means the rest is
 played for money instead of survival. Win or lose is decided once, when the last
 ball drains.
 
+### When the run ends
+
+Victory or defeat, the last screen carries a summary of the run:
+
+| Line | What it is |
+| --- | --- |
+| Best stage | The highest single stage you scored, and which one it was |
+| Longest combo | The most scoring contacts you strung together without a 2s gap |
+| Most-used ball | The ball type served most often, and how many times |
+
+The combo count is not the fever level: it keeps counting past the ×5 cap, so it
+is a record of how long you kept the ball working rather than of what the meter
+was worth.
+
 ### Score targets
 
 <!-- BEGIN GENERATED: blinds -->
@@ -80,16 +94,23 @@ score += value x MULT x FEVER
 ```
 
 - Starts each ball at **×1**
-- **+0.25** on every scoring contact
+- **5 scoring contacts** raise it one level
+- Each level is worth **+0.25**
 - Caps at **×5**
-- Drops **straight back to ×1** after **2 seconds** without a contact
+- Drops **straight back to ×1** after **2 seconds** without a contact, and takes
+  any part-built level with it
 
 MULT is the ball you have built and lose on the drain. Fever is the last two
 seconds. The contact that *starts* a combo scores at ×1 — only the ones after it
 are worth more.
 
-The right-hand panel shows the current fever and a bar counting down the two
-seconds you have left to keep it.
+The right-hand panel shows the current fever, pips counting the contacts banked
+toward the next level, and a bar counting down the two seconds you have left to
+keep the chain alive.
+
+Combo Coil and the Ember ball make fever build **twice as fast**. Both work on
+the contacts needed — three instead of five — rather than on the size of a
+level, so a level is worth the same 0.25 to everyone.
 
 ### What each target is worth
 
@@ -273,6 +294,10 @@ entirely on one axis meets a wall.
 | Balls per stage | 3 |
 | Ball slots | 5 |
 | Ball upgrade | $5, +$2 per level owned |
+| Fever: contacts per level | 5 |
+| Fever: per level | +0.25x |
+| Fever: cap | x5 |
+| Fever: chain window | 2s |
 | Nudges held | 2 |
 | Nudge recharge | 5s each |
 | Payout multiplier cap | x5 |

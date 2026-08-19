@@ -28,6 +28,7 @@ func _ready() -> void:
 	_slow_ball()
 	_fever()
 	_balls()
+	_summary()
 
 	if _failures > 0:
 		push_error("RUN_TEST_FAILED: %d check(s)" % _failures)
@@ -45,6 +46,11 @@ func _ready() -> void:
 ## fever tests use register_hit directly, because there the combo is the point.
 func _cold_hit(source: int, count: int = 1) -> int:
 	Run.fever = Run.FEVER_BASE
+	# Progress as well as the level, or contacts banked by an earlier cold hit
+	# would eventually tip a level in the middle of a test that is not about
+	# fever at all.
+	Run._fever_progress = 0.0
+	Run.fever_chain = 0
 	return Run.register_hit(source, count)
 
 
@@ -460,44 +466,89 @@ func _slow_ball() -> void:
 
 ## Fever: a short-term combo multiplier stacked on top of MULT.
 func _fever() -> void:
+	# Five contacts to a level, so the first four move nothing at all.
 	Run.new_run(1050)
 	_eq(Run.fever, Run.FEVER_BASE, "fever starts at x1")
-	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "the first hit is not yet feverish")
-	_eq(Run.fever, 1.25, "but it stokes the fever")
-	_eq(Run.register_hit(Catalog.Source.BUMPER), 13, "and the next hit is worth more")
+	for i in Run.FEVER_HITS_PER_LEVEL - 1:
+		_eq(Run.register_hit(Catalog.Source.BUMPER), 10,
+			"hit %d is still worth base" % (i + 1))
+		_eq(Run.fever, Run.FEVER_BASE, "and the meter has not moved")
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 10, "the fifth is scored before it counts")
+	_eq(Run.fever, 1.25, "and it is the one that lands the level")
+	_eq(Run.register_hit(Catalog.Source.BUMPER), 13, "the next hit is worth more")
 
 	# It multiplies with MULT rather than replacing it.
 	Run.new_run(1051)
 	Run.add_mult(3.0)  # MULT x4
-	Run.register_hit(Catalog.Source.BUMPER)  # fever -> 1.25
+	for i in Run.FEVER_HITS_PER_LEVEL:
+		Run.register_hit(Catalog.Source.BUMPER)  # fever -> 1.25
 	_eq(Run.register_hit(Catalog.Source.BUMPER), 50, "10 x MULT 4 x fever 1.25")
 
 	# Capped, or a bumper nest on a stacked MULT would break the ante curve.
 	Run.new_run(1052)
-	for i in 40:
+	var to_cap := int((Run.FEVER_MAX - Run.FEVER_BASE) / Run.FEVER_STEP) * Run.FEVER_HITS_PER_LEVEL
+	for i in to_cap:
 		Run.register_hit(Catalog.Source.BUMPER)
 	_eq(Run.fever, Run.FEVER_MAX, "fever is capped")
+	_eq(Run.fever_hits_done(), 0, "and stops banking progress it cannot spend")
+	Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.fever, Run.FEVER_MAX, "further hits change nothing")
 
 	# It expires on a cliff.
 	Run.new_run(1053)
-	Run.register_hit(Catalog.Source.BUMPER)
+	for i in Run.FEVER_HITS_PER_LEVEL:
+		Run.register_hit(Catalog.Source.BUMPER)
 	_check(Run.fever > Run.FEVER_BASE, "fever is up")
 	_check(Run.fever_remaining() > 0.0, "with time on it")
 	Run._fever_expires = float(Time.get_ticks_msec()) - 1.0
 	Run._expire_fever()
 	_eq(Run.fever, Run.FEVER_BASE, "and drops all the way back, not part way")
 
+	# Part-built progress expires too, which is the whole point of a combo:
+	# five hits spread over a minute must not add up to a level.
+	Run.new_run(1056)
+	for i in Run.FEVER_HITS_PER_LEVEL - 1:
+		Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.fever_hits_done(), Run.FEVER_HITS_PER_LEVEL - 1, "four contacts are banked")
+	_check(Run.fever_remaining() > 0.0, "and the chain shows its clock before level 1")
+	Run._fever_expires = float(Time.get_ticks_msec()) - 1.0
+	Run._expire_fever()
+	_eq(Run.fever_hits_done(), 0, "a broken chain drops the part-built level")
+	Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.fever, Run.FEVER_BASE, "so the next lone hit does not complete it")
+
+	# The chain is counted for the run summary, and outlives the cap.
+	Run.new_run(1057)
+	for i in 7:
+		Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.fever_chain, 7, "the chain counts every contact")
+	_eq(Run.best_chain, 7, "and the best is remembered")
+	Run._fever_expires = float(Time.get_ticks_msec()) - 1.0
+	Run._expire_fever()
+	_eq(Run.fever_chain, 0, "a broken chain starts over")
+	_eq(Run.best_chain, 7, "but the run's best stands")
+	Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.best_chain, 7, "and a shorter chain does not replace it")
+
 	# A new ball starts cold.
 	Run.new_run(1054)
 	Run.register_hit(Catalog.Source.BUMPER)
 	Run.begin_ball()
 	_eq(Run.fever, Run.FEVER_BASE, "a new ball starts at x1")
+	_eq(Run.fever_hits_done(), 0, "with nothing banked")
+	_eq(Run.fever_chain, 0, "and no chain")
 
-	# Combo Coil now feeds fever instead of MULT.
+	# Combo Coil now feeds fever instead of MULT. "Twice as fast" is applied to
+	# the contacts needed, not to the size of the level: everyone's level is
+	# worth 0.25, and what the trinket buys is reaching it sooner.
 	Run.new_run(1055)
 	Run.add_trinket("combo_coil")
+	for i in 2:
+		Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.fever, Run.FEVER_BASE, "two doubled contacts are not yet a level")
 	Run.register_hit(Catalog.Source.BUMPER)
-	_eq(Run.fever, 1.5, "Combo Coil builds fever twice as fast")
+	_eq(Run.fever, 1.25, "Combo Coil reaches it in three rather than five")
+	_eq(Run.FEVER_STEP, 0.25, "and the level is worth the same to everyone")
 
 
 ## Ball slots, the draw, and each ball's effect.
@@ -548,11 +599,14 @@ func _balls() -> void:
 	Run.current_ball = Catalog.VANILLA
 	_eq(_cold_hit(Catalog.Source.BUMPER), 10, "and does nothing when it is not in play")
 
-	# Ember builds fever faster.
+	# Ember builds fever faster, in contacts rather than in step size.
 	Run.new_run(1063)
 	Run.current_ball = "ember"
+	for i in 2:
+		Run.register_hit(Catalog.Source.BUMPER)
+	_eq(Run.fever, Run.FEVER_BASE, "two doubled contacts are not yet a level")
 	Run.register_hit(Catalog.Source.BUMPER)
-	_eq(Run.fever, 1.5, "Ember doubles the fever step")
+	_eq(Run.fever, 1.25, "Ember reaches the level in three contacts, not five")
 
 	# Heavy changes the geometry, and only Heavy does.
 	Run.new_run(1064)
@@ -628,3 +682,58 @@ func _balls() -> void:
 		Run.add_ball("ember")
 	_check(not Run.can_take({"kind": "ball", "id": "gold", "cost": 7}),
 		"a full rack cannot take another ball")
+
+
+## The end-of-run summary. Nothing here feeds a rule, so the only thing that can
+## go wrong is that it quietly reports the wrong story -- which is exactly the
+## kind of bug nothing else in the suite would catch.
+func _summary() -> void:
+	Run.new_run(1080)
+	_eq(Run.best_stage_score, 0, "a new run has no best stage")
+	_eq(Run.best_chain, 0, "and no best chain")
+	_eq(Run.most_used_ball()[1], 0, "and no ball has been served")
+
+	# The best stage is the highest single stage, not the last and not the sum.
+	Run.register_hit(Catalog.Source.ORBIT, 5)  # 500 this stage
+	_eq(Run.best_stage_score, 500, "the first stage sets the mark")
+	_eq(Run.best_stage_label, "Ante 1 %s" % Catalog.BLIND_NAME[Catalog.SMALL],
+		"labelled with the stage it happened in")
+
+	Run.begin_stage()
+	_eq(Run.score, 0, "the new stage starts at zero")
+	Run.register_hit(Catalog.Source.ORBIT, 1)  # 100, a worse stage
+	_eq(Run.best_stage_score, 500, "a worse stage does not replace it")
+
+	Run.begin_stage()
+	Run.ante = 4
+	Run.blind = Catalog.BOSS
+	Run.register_hit(Catalog.Source.ORBIT, 9)  # 900, a better stage
+	_eq(Run.best_stage_score, 900, "a better one does")
+	_eq(Run.best_stage_label, "Ante 4 %s" % Catalog.BLIND_NAME[Catalog.BOSS],
+		"and brings its own label")
+
+	# Balls are counted as they are served, so the tally is of what was actually
+	# played rather than of what was owned.
+	Run.new_run(1081)
+	for i in 12:
+		Run.ball_queue = ["gold"] if i < 8 else ["ember"]
+		Run.take_next_ball()
+	_eq(int(Run.ball_uses.get("gold", 0)), 8, "every Gold served is counted")
+	_eq(int(Run.ball_uses.get("ember", 0)), 4, "and every Ember")
+	var top: Array = Run.most_used_ball()
+	_eq(str(top[0]), "gold", "the most-used ball is the one played most")
+	_eq(int(top[1]), 8, "with its count")
+
+	# Run-scoped, not stage-scoped: a new stage must not wipe the story so far.
+	Run.register_hit(Catalog.Source.ORBIT, 3)  # 300
+	Run.register_hit(Catalog.Source.BUMPER)    # and a chain of 2
+	_eq(Run.best_stage_score, 300, "the stage is on the board")
+	Run.begin_stage()
+	_eq(Run.best_stage_score, 300, "and survives the next stage starting")
+	_eq(Run.best_chain, 2, "as does the best chain")
+	_eq(int(Run.ball_uses.get("gold", 0)), 8, "and the ball tally")
+
+	Run.new_run(1082)
+	_eq(Run.best_stage_score, 0, "only a new run clears the best stage")
+	_eq(Run.best_chain, 0, "the best chain")
+	_eq(Run.ball_uses.size(), 0, "and the tally")
