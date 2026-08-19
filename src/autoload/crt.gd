@@ -23,7 +23,11 @@ func _ready() -> void:
 
 	_screen = ColorRect.new()
 	_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_screen.color = Color.WHITE  # the shader replaces this wholesale
+	# Transparent, not white. The shader assigns COLOR outright so this is never
+	# seen when it works -- but when it does *not* compile, the quad falls back
+	# to this colour over the entire screen. White meant a broken shader blanked
+	# the game; transparent means it degrades to simply having no effect.
+	_screen.color = Color(0.0, 0.0, 0.0, 0.0)
 	# Without this the shop's buttons stop taking clicks, because a full-screen
 	# Control in front of them swallows every one.
 	_screen.mouse_filter = Control.MOUSE_FILTER_IGNORE
