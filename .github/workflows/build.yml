@@ -69,7 +69,11 @@ jobs:
       - name: Inlane / outlane routing test
         run: |
           set -euo pipefail
-          ./godot --headless --path . --quit-after 3000 tests/inlane_test.tscn 2>&1 | tee -a build.log
+          # 8000 frames, not 3000: the suite is eight cases now and the budget
+          # was set when it was four. Cut short it prints every case that did
+          # run as "ok" and simply never reaches INLANE_TEST_OK, which reads
+          # like a hang rather than like a timeout.
+          ./godot --headless --path . --quit-after 8000 tests/inlane_test.tscn 2>&1 | tee -a build.log
           grep -q "INLANE_TEST_OK" build.log
 
       # What the flippers do to a ball, asserted against measurements. The coil
