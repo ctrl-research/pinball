@@ -159,9 +159,14 @@ contact** — taking any part-built level with it.
 A level per contact was the first version, and the number moved so constantly
 that it read as noise attached to the ball rather than as something being built:
 every contact bumped it, so no contact felt like it mattered. Five gives the
-meter a floor to climb and makes the level itself an event. The panel shows pips
-for the contacts banked so far, because a meter that only moves once every five
-hits looks broken unless something accounts for the four in between.
+meter a floor to climb and makes the level itself an event.
+
+The readout is five segments, one per contact, with the chain's remaining time
+as a hairline beneath them. It began as a single continuous bar showing only the
+timer, with progress hidden in asterisks up in the header -- which put the two
+halves of one mechanic in two places, and rendered the half the player is
+actively working on as punctuation. Segments say "five hits to the next level"
+without anyone having to be told.
 
 The multipliers that "build fever twice as fast" — Combo Coil, the Ember ball —
 act on the *contacts needed*, not on the size of a level. A level is worth 0.25

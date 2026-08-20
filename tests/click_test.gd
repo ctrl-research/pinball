@@ -32,6 +32,7 @@ func _ready() -> void:
 	await _test_buy()
 	await _test_sell()
 	await _test_on_screen()
+	_test_panel_fits()
 	_finish()
 
 
@@ -84,6 +85,37 @@ func _test_sell() -> void:
 			% [before, Run.tokens])
 	else:
 		print("  ok: a click on the inventory sells the item")
+
+
+## The right panel's last flowing element must not run into the block anchored
+## to its floor.
+##
+## The panel is a fixed 348px and every feature added to it has been paid for
+## out of the same budget. When the fever readout became a five-segment meter it
+## grew by six pixels and landed on top of the key map -- which nothing caught,
+## because overlapping labels still draw, still pass every other gate, and only
+## look wrong. This is the invariant that was actually broken: the meter ends
+## above the keys.
+func _test_panel_fits() -> void:
+	var meter: Control = _game.hud._fever_meter
+	var keys: Label = null
+	for child in _game.hud._root.get_children():
+		if child is Label and (child as Label).text.begins_with("A / D"):
+			keys = child as Label
+	if keys == null:
+		_fail("the key map is missing from the panel")
+		return
+
+	var meter_bottom := meter.position.y + meter.size.y
+	var panel := Cabinet.PANEL_RIGHT
+	if meter_bottom > keys.position.y:
+		_fail("the fever meter ends at y=%.0f, over the key map at y=%.0f"
+			% [meter_bottom, keys.position.y])
+	elif meter_bottom > panel.position.y + panel.size.y:
+		_fail("the fever meter ends at y=%.0f, past the panel at y=%.0f"
+			% [meter_bottom, panel.position.y + panel.size.y])
+	else:
+		print("  ok: the right panel's contents fit above the key map")
 
 
 ## Every overlay must fit on the screen, checked at its worst case: a full rack
