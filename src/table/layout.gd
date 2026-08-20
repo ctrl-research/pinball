@@ -193,12 +193,77 @@ const STANDUP_TARGETS := [
 ## the orbit — it is the reward half of the orbit's risk.
 const SPINNER_RECT := Rect2(9, 122, 18, 16)
 const ROLLOVER_SIZE := Vector2(22, 10)
+## Three, so the top lanes are a *group*: lighting all of them pays a bonus and
+## resets them, which turns the arch from a place the ball passes through into
+## something with a state the player is trying to advance.
 const ROLLOVERS := [
-	Vector2(105, 56),
-	Vector2(149, 56),
+	Vector2(94, 56),
+	Vector2(127, 56),
+	Vector2(160, 56),
 ]
 ## Crossing this, high on the left orbit, completes an orbit shot.
 const ORBIT_RECT := Rect2(9, 96, 18, 12)
+
+# --- The ramp -----------------------------------------------------------------
+#
+# The habitrail, and the one element here that is not a bounce. A ball entering
+# the mouth on the right is lifted off the playfield, carried over the top of
+# the table, and dropped into the left orbit -- where it runs down past the
+# spinner and into the left inlane, exactly as a real loop-the-loop does.
+#
+# It is the shot the table was missing. Everything else on this playfield
+# happens *to* the ball; the ramp is somewhere you can deliberately put it, and
+# because it feeds an existing lane it makes the orbit reachable from the left
+# flipper as well as by threading the gap.
+#
+# The ball has no collision while it is up there, which is what "elevated"
+# means in a top-down projection: it passes over the standup targets and the
+# top lanes rather than through them.
+
+## The mouth, on the right where a shot off the left flipper arrives.
+const RAMP_ENTRY := Rect2(190, 186, 20, 16)
+
+## Centreline of the track, entry first. Stored as a plain Array because a const
+## cannot hold a PackedVector2Array; `ramp_path()` packs it.
+## Routed to keep clear playfield on both sides of it: hugging the arch, the
+## track read as a second wall rather than as something the ball travels along.
+## It also stays below the top lanes (which end at y=61) and above the bumpers
+## (which start at y=88), so it crosses the table through the one band that is
+## empty.
+const RAMP_POINTS := [
+	Vector2(200, 194), Vector2(213, 166), Vector2(218, 134), Vector2(212, 106),
+	Vector2(198, 86), Vector2(172, 76), Vector2(140, 72), Vector2(106, 76),
+	Vector2(76, 88), Vector2(50, 106), Vector2(34, 124),
+]
+
+## How wide the track reads, and how fast the ball is carried along it. The
+## speed is deliberately slower than a ball in flight: watching a shot travel is
+## most of what a ramp is for, and one that flicks through instantly reads as a
+## teleport rather than as a route.
+const RAMP_WIDTH := 9.0
+const RAMP_SPEED := 260.0
+
+## What the ball is doing when the track lets go of it: straight down the left
+## orbit, at a speed that carries it past the spinner rather than trickling.
+const RAMP_EXIT_SPEED := 190.0
+
+# --- The saucer ---------------------------------------------------------------
+#
+# A hole that swallows the ball, holds it, and spits it back out. Every other
+# element on this table is instantaneous, so the saucer is the only one that
+# makes the ball *stop* -- which is why it is worth having: a second of silence
+# in the middle of a busy table is a punctuation mark, and it is the moment the
+# player reads their score.
+
+const SAUCER_CENTRE := Vector2(183, 152)
+const SAUCER_RADIUS := 8.0
+## Held this long before it is kicked out. Long enough to register as a capture,
+## short enough not to feel like the game has stopped.
+const SAUCER_HOLD := 0.85
+## Kicked back down the table towards the flippers, not up into the bumpers --
+## the reward for the shot is the score, and returning the ball somewhere
+## playable is what stops the saucer feeling like a punishment.
+const SAUCER_KICK := Vector2(-40.0, 300.0)
 
 ## The drain line sits exactly at the bottom of the playfield, and the outlane
 ## chutes stop 6px below it. Both are bounded so that the whole table, chute
@@ -257,6 +322,38 @@ static func arch_polyline(steps: int = 96, bias: float = 0.0) -> PackedVector2Ar
 
 
 ## Mirror a point across the lower playfield's centre line.
+## The ramp's centreline, packed.
+static func ramp_path() -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for p in RAMP_POINTS:
+		out.append(p)
+	return out
+
+
+## Total length of the track, for turning progress into a position.
+static func ramp_length() -> float:
+	var total := 0.0
+	for i in range(RAMP_POINTS.size() - 1):
+		total += (RAMP_POINTS[i + 1] as Vector2).distance_to(RAMP_POINTS[i])
+	return total
+
+
+## Where a ball is when it is `distance` along the track, and which way it is
+## heading -- returned together because every caller needs both and walking the
+## polyline twice to get them separately is how they drift apart.
+static func ramp_at(distance: float) -> Array:
+	var travelled := 0.0
+	for i in range(RAMP_POINTS.size() - 1):
+		var a: Vector2 = RAMP_POINTS[i]
+		var b: Vector2 = RAMP_POINTS[i + 1]
+		var seg := a.distance_to(b)
+		if travelled + seg >= distance or i == RAMP_POINTS.size() - 2:
+			var t := clampf((distance - travelled) / maxf(seg, 0.001), 0.0, 1.0)
+			return [a.lerp(b, t), (b - a).normalized()]
+		travelled += seg
+	return [RAMP_POINTS[RAMP_POINTS.size() - 1], Vector2.DOWN]
+
+
 static func mirror(p: Vector2) -> Vector2:
 	return Vector2(2.0 * LOWER_CENTRE - p.x, p.y)
 

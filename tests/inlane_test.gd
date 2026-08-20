@@ -22,6 +22,8 @@ var _ball: Ball
 var _reached_flipper := false
 var _went_outlane := false
 var _min_x := INF
+var _was_held := false
+var _was_released := false
 
 
 func _ready() -> void:
@@ -80,6 +82,33 @@ func _ready() -> void:
 			"at": Vector2(14, 250), "want_outlane": true, "coil": "kickback",
 			"used": true, "box": Rect2(130, 282, 44, 42),
 		},
+		# The two elements that take the ball out of the simulation and hand it
+		# back. Both are asserted on where the ball *ends up*, because that is
+		# the whole promise: a capture that does not return the ball somewhere
+		# playable is a drain with extra steps.
+		{
+			"name": "the ramp carries the ball round to the left orbit",
+			"at": Vector2(200, 210), "capture": "ramp", "shot": Vector2(0, -300),
+			"frames": 700, "reach_x": 60.0,
+			"want_outlane": false, "box": Rect2(0, 0, 0, 0),
+		},
+		{
+			"name": "a ball merely falling past the mouth does not make the ramp",
+			"at": Vector2(200, 170), "no_capture": true, "frames": 60,
+			"reach_x": 999.0, "want_outlane": false, "box": Rect2(0, 0, 0, 0),
+		},
+		{
+			"name": "the saucer holds the ball and kicks it back into play",
+			"at": TableLayout.SAUCER_CENTRE, "capture": "saucer", "frames": 260,
+			"reach_x": 999.0, "want_outlane": false, "box": Rect2(0, 0, 0, 0),
+		},
+		# The top lanes are a group, and a group that never resets is a bonus you
+		# collect once and then a row of lamps that mean nothing.
+		{
+			"name": "lighting every top lane pays a bonus and resets them",
+			"at": Vector2(200, 190), "lanes": true, "frames": 8,
+			"reach_x": 999.0, "want_outlane": false, "box": Rect2(0, 0, 0, 0),
+		},
 		# The weakest plunge has to be a real shot. Twice now the floor has been
 		# set to a speed that merely gets the ball out of the lane, which is a
 		# lower bar than getting it onto the playfield: the ball crests the arch
@@ -101,6 +130,8 @@ func _next_case() -> void:
 	_reached_flipper = false
 	_went_outlane = false
 	_min_x = INF
+	_was_held = false
+	_was_released = false
 	if _index >= _cases.size():
 		_finish()
 		return
@@ -121,6 +152,16 @@ func _next_case() -> void:
 		# the second ball down the same outlane.
 		_table._kickback_used = true
 	_ball = _table.spawn_ball_at(_cases[_index]["at"])
+	var shot: Vector2 = _cases[_index].get("shot", Vector2.ZERO)
+	if shot != Vector2.ZERO:
+		_ball.linear_velocity = shot
+	if bool(_cases[_index].get("lanes", false)):
+		# Light them by hand rather than by threading a ball through three
+		# lanes: what is under test is the group, not the aim.
+		Run.score = 0
+		for r in _table._rollovers:
+			r.lit = true
+		_table._check_lane_group()
 	if bool(_cases[_index].get("plunge", false)):
 		_ball.linear_velocity = Vector2(0.0, -TableLayout.PLUNGE_MIN_SPEED)
 		_ball.in_plunger_lane = false
@@ -138,11 +179,44 @@ func _physics_process(_delta: float) -> void:
 		if bool(_ball.get_meta("via_outlane", false)):
 			_went_outlane = true
 		_min_x = minf(_min_x, _ball.position.x)
+		if _ball.held:
+			_was_held = true
+		elif _was_held:
+			_was_released = true
 
 	if _frames < int(case.get("frames", SETTLE_FRAMES)):
 		return
 
-	if str(case.get("coil", "")) == "kickback":
+	if bool(case.get("no_capture", false)):
+		if _was_held:
+			_fail("%s -- the mouth took it anyway" % case["name"])
+		else:
+			print("  ok: %s" % case["name"])
+	elif bool(case.get("lanes", false)):
+		var still_lit := 0
+		for r in _table._rollovers:
+			if r.lit:
+				still_lit += 1
+		if still_lit > 0:
+			_fail("%s -- %d lane(s) stayed lit" % [case["name"], still_lit])
+		elif Run.score <= 0:
+			_fail("%s -- completing them paid nothing" % case["name"])
+		else:
+			print("  ok: %s (paid %d)" % [case["name"], Run.score])
+	elif str(case.get("capture", "")) != "":
+		# Routing, not survival -- the same rule the rest of this suite follows.
+		# Nothing is holding a flipper, so a ball handed back to the playfield
+		# rolls down and drains however good the shot was; what is asserted is
+		# that it was taken, given back, and given back *somewhere*.
+		if not _was_held:
+			_fail("%s -- it was never picked up" % case["name"])
+		elif not _was_released:
+			_fail("%s -- it was picked up and never handed back" % case["name"])
+		elif _min_x > float(case["reach_x"]):
+			_fail("%s -- it came back at x=%.0f, not the far side" % [case["name"], _min_x])
+		else:
+			print("  ok: %s (released, reached x=%.0f)" % [case["name"], _min_x])
+	elif str(case.get("coil", "")) == "kickback":
 		var alive := is_instance_valid(_ball) and _table.balls.has(_ball)
 		if bool(case.get("used", false)):
 			if alive:

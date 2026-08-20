@@ -559,6 +559,46 @@ away information, not power, and a player who knows the table by feel beats it.
 
 ## The table
 
+### The playfield, and what Space Cadet has that this did not
+
+The original layout was a complete pinball table in the sense that every part of
+it worked, and an incomplete one in the sense that every part of it did the same
+*kind* of thing: the ball arrives, something bounces it away, a number goes up.
+3D Pinball Space Cadet — the reference this project started from — is busier
+than that, and the difference is not the number of targets. It is that some of
+its elements **take the ball somewhere**.
+
+So three were added, each chosen because it does something none of the others
+could:
+
+- **The ramp.** A shot you aim at rather than a thing that happens to the ball.
+  Its mouth is on the right; it carries the ball over the top of the table and
+  drops it into the left orbit, which means it also hands the player the orbit
+  and the spinner on the way down. That is the point: it makes an existing shot
+  reachable from the other flipper, so the table has a *route* through it rather
+  than a set of independent bumpers.
+
+  In a top-down projection there is no third axis to lift a ball into, so
+  "elevated" has to mean the playfield stops being able to touch it: the ball is
+  frozen, its collision turned off, and walked along a polyline by hand. It is
+  drawn last and offset, over everything it passes above.
+
+- **The saucer.** The only element on the table that makes the ball *stop*.
+  Everything else resolves in the tick it is touched; a second of silence in the
+  middle of a busy table is punctuation, and it is when the player actually
+  reads their score.
+
+- **A third top lane.** Two lanes are a pair; three are a group you can complete.
+  It turns the arch from somewhere the ball passes through into something with a
+  state the player is advancing, which is the cheapest complexity on this list.
+
+What is deliberately *not* here is Space Cadet's mission system. That is a
+progression layer, and this game already has one — the ante ladder, the shop,
+five categories of modifier. Bolting missions on top would be a second answer to
+a question already answered.
+
+
+
 One machine for now. Variety comes from mods and trinkets rather than from a table
 pool; a second table is worth building only once the modifier layers are proven,
 because every table has to be balanced against all of them.

@@ -25,7 +25,57 @@ const STUCK_TIME := 2.5
 
 var in_plunger_lane := true
 
+## True while the table is carrying the ball rather than the physics: on the
+## ramp, or held in the saucer. Collision is off and gravity does not apply, so
+## nothing else on the playfield may act on it -- the stuck-ball relay and the
+## escape backstop both have to sit this out or they will "rescue" a ball that
+## is exactly where it is meant to be.
+var held := false
+
 var _stuck_for := 0.0
+
+
+## Takes the ball out of the simulation without destroying it, so the table can
+## move it along a path by hand.
+##
+## `held` flips immediately because the rest of the table reads it this frame to
+## decide whether to leave the ball alone. Everything the *physics server* owns
+## is deferred: all of this is reached from a body_entered signal, which fires
+## inside the server's flush, and freezing a body or disabling its shapes in
+## there is refused outright -- which is what "body_set_mode" errors are, and
+## what left a ball stuck in the saucer forever.
+func capture(where: Vector2) -> void:
+	held = true
+	_stuck_for = 0.0
+	_finish_capture.call_deferred(where)
+
+
+func _finish_capture(where: Vector2) -> void:
+	freeze = true
+	collision_layer = 0
+	collision_mask = 0
+	position = where
+	linear_velocity = Vector2.ZERO
+	angular_velocity = 0.0
+
+
+## Hands the ball back to the simulation, moving and launching it in the same
+## step. The velocity has to be applied *after* the unfreeze: a frozen
+## RigidBody2D discards what you write to linear_velocity, so releasing and
+## launching as two separate calls silently drops the launch.
+func release(where: Vector2, velocity: Vector2) -> void:
+	held = false
+	_stuck_for = 0.0
+	_finish_release.call_deferred(where, velocity)
+
+
+func _finish_release(where: Vector2, velocity: Vector2) -> void:
+	freeze = false
+	collision_layer = 2
+	collision_mask = 1 | 2
+	position = where
+	linear_velocity = velocity
+	angular_velocity = 0.0
 
 
 func _ready() -> void:
@@ -52,6 +102,9 @@ func _ready() -> void:
 	max_contacts_reported = 4
 	collision_layer = 2
 	collision_mask = 1 | 2  # walls, and other balls during multiball
+	# The ramp and the saucer both take the ball out of the simulation, and a
+	# body that is frozen when the shapes are set up never wakes correctly.
+	freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
 
 	radius = TableLayout.BALL_RADIUS * Run.ball_radius_scale()
 	tint = Catalog.BALL_COLOURS.get(Run.current_ball, tint)
@@ -71,8 +124,9 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 
 func _physics_process(delta: float) -> void:
 	# Never ball-search a ball sitting in the plunger lane; that is where it is
-	# supposed to be sitting still.
-	if in_plunger_lane or linear_velocity.length() > STUCK_SPEED:
+	# supposed to be sitting still. Same for one the table is carrying: a ball
+	# on the ramp or in the saucer is motionless on purpose.
+	if held or in_plunger_lane or linear_velocity.length() > STUCK_SPEED:
 		_stuck_for = 0.0
 		return
 	_stuck_for += delta
