@@ -138,7 +138,7 @@ applies to that whole class of target, not one instance of it.
 
 Three elements that do more than bounce the ball back.
 
-**The ramp** — the mouth on the right, below the standup targets. A ball that
+**The ramp** — the mouth on the right, level with the bumpers. A ball that
 enters it is lifted off the playfield, carried over the top of the table, and
 dropped into the **left orbit**, where it runs down past the spinner and into
 the left inlane. It scores on entry and then hands you the orbit and the spinner
@@ -147,7 +147,8 @@ for free, so it is worth more than its own number suggests.
 Nothing on the playfield can touch the ball while it is up there. It passes over
 the bumpers and the lanes rather than through them.
 
-**The saucer** — the orange-rimmed hole in the middle right. It swallows the
+**The saucer** — the orange-rimmed hole on the left, beside the bumpers. It is
+a cross-table shot off the right flipper, where the ramp is a shot off the left. It swallows the
 ball, holds it for just under a second, and kicks it back down towards the
 flippers. It is the only place on this table where the ball stops, which makes
 it the moment to read your score. It will not take another ball straight away.
@@ -286,7 +287,6 @@ coils make good balls more likely.
 | Heavy Bat | Harder shots, and less control of them | $6 | $4 |
 | Hot Winding | Flippers sweep 20% faster | $6 | $4 |
 | Dead Bounce | A ball landing on a resting flipper bounces up | $8 | $6 |
-| Post Save | A centre post rises once per ball | $8 | $6 |
 | Kickback | The left outlane fires the ball back, once a stage | $9 | $6 |
 <!-- END GENERATED: coils -->
 
@@ -298,8 +298,7 @@ and less control of where the ball goes, and a machine wearing it *and* Hot
 Winding is genuinely harder to hold. That is deliberate — a category where
 everything is an improvement is a shopping list, not a choice.
 
-Two of them are one-use saves, and they differ in what brings them back:
-**Post Save** rearms with every ball, **Kickback** only once a stage.
+**Kickback** is a one-use save: it comes back once a stage, not once a ball.
 
 ---
 
@@ -314,7 +313,6 @@ the machine rather than the arithmetic.
 | Outlane Guards | Both outlanes are narrowed | $6 |
 | Extra Bumper | A fourth pop bumper joins the cluster | $7 |
 | Wide Flippers | +4px flipper length; a narrower drain | $8 |
-| Post Rubber | A centre post between the flippers | $8 |
 <!-- END GENERATED: mods -->
 
 ---

@@ -221,7 +221,14 @@ const ORBIT_RECT := Rect2(9, 96, 18, 12)
 # top lanes rather than through them.
 
 ## The mouth, on the right where a shot off the left flipper arrives.
-const RAMP_ENTRY := Rect2(190, 186, 20, 16)
+##
+## It sat at y=186 to begin with, which put it directly behind the right
+## slingshot: the face of that triangle runs (202,212)-(156,244), and the line
+## from the left flipper to the old mouth crossed it, so the shot was blocked by
+## a bumper before it ever got near the ramp. Raised above the slingshot's reach
+## the same shot arrives cleanly at about 39 degrees off vertical, which is an
+## ordinary ramp shot rather than a threading exercise.
+const RAMP_ENTRY := Rect2(196, 142, 22, 18)
 
 ## Centreline of the track, entry first. Stored as a plain Array because a const
 ## cannot hold a PackedVector2Array; `ramp_path()` packs it.
@@ -231,9 +238,9 @@ const RAMP_ENTRY := Rect2(190, 186, 20, 16)
 ## (which start at y=88), so it crosses the table through the one band that is
 ## empty.
 const RAMP_POINTS := [
-	Vector2(200, 194), Vector2(213, 166), Vector2(218, 134), Vector2(212, 106),
-	Vector2(198, 86), Vector2(172, 76), Vector2(140, 72), Vector2(106, 76),
-	Vector2(76, 88), Vector2(50, 106), Vector2(34, 124),
+	Vector2(207, 151), Vector2(216, 124), Vector2(214, 100), Vector2(200, 82),
+	Vector2(174, 72), Vector2(142, 70), Vector2(108, 74), Vector2(78, 86),
+	Vector2(52, 104), Vector2(34, 122),
 ]
 
 ## How wide the track reads, and how fast the ball is carried along it. The
@@ -255,15 +262,27 @@ const RAMP_EXIT_SPEED := 190.0
 # in the middle of a busy table is a punctuation mark, and it is the moment the
 # player reads their score.
 
-const SAUCER_CENTRE := Vector2(183, 152)
+## Moved to the left. It began at (183,152), which is almost exactly where a
+## ball leaving the left flipper arrives -- so the table's most dramatic element
+## was the one the player could not avoid hitting, which made it feel like an
+## accident rather than a shot.
+##
+## Over here it is fed by the *right* flipper instead, which gives each flipper
+## one marquee shot: the ramp from the left, the saucer from the right.
+## Sits below the ramp's descent, not under it. At (66,106) it was tucked
+## directly beneath the track's last leg -- which in a top-down projection means
+## the ramp is drawn over the top of it and the saucer is, for practical
+## purposes, not on the table at all.
+const SAUCER_CENTRE := Vector2(68, 126)
 const SAUCER_RADIUS := 8.0
 ## Held this long before it is kicked out. Long enough to register as a capture,
 ## short enough not to feel like the game has stopped.
 const SAUCER_HOLD := 0.85
-## Kicked back down the table towards the flippers, not up into the bumpers --
-## the reward for the shot is the score, and returning the ball somewhere
-## playable is what stops the saucer feeling like a punishment.
-const SAUCER_KICK := Vector2(-40.0, 300.0)
+## Kicked back down the table towards the flippers, and angled away from the
+## left wall it now sits against -- the reward for the shot is the score, and
+## returning the ball somewhere playable is what stops a saucer feeling like a
+## punishment.
+const SAUCER_KICK := Vector2(40.0, 300.0)
 
 ## The drain line sits exactly at the bottom of the playfield, and the outlane
 ## chutes stop 6px below it. Both are bounded so that the whole table, chute

@@ -280,9 +280,6 @@ const COILS := {
 	"dead_bounce": {
 		"name": "Dead Bounce", "desc": "A ball landing on a resting flipper bounces up", "cost": 8,
 	},
-	"post_save": {
-		"name": "Post Save", "desc": "A centre post rises once per ball", "cost": 8,
-	},
 	"kickback": {
 		"name": "Kickback", "desc": "The left outlane fires the ball back, once a stage", "cost": 9,
 	},
@@ -298,9 +295,6 @@ const MODS := {
 	},
 	"wide_flippers": {
 		"name": "Wide Flippers", "desc": "+4px flipper length; a narrower drain", "cost": 8,
-	},
-	"post_rubber": {
-		"name": "Post Rubber", "desc": "A centre post between the flippers", "cost": 8,
 	},
 	"outlane_guards": {
 		"name": "Outlane Guards", "desc": "Both outlanes are narrowed", "cost": 6,

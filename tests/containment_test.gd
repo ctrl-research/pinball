@@ -55,13 +55,11 @@ var _ball: Ball
 
 func _ready() -> void:
 	Run.new_run(777)
-	# The three coils that touch geometry or velocity, which is the rack most
-	# likely to open a gap: Heavy Bat makes the bats livelier, Post Save puts a
-	# body between them, and Dead Bounce writes velocities directly. Hot Winding
-	# is left off -- it only changes sweep time, and the slot budget is three.
-	# A ball that leaves the cabinet never drains, so the stage never ends and
-	# the run cannot even be lost.
-	for id in ["heavy_bat", "dead_bounce", "post_save"]:
+	# A full rack, because that is the configuration most likely to open a gap:
+	# Heavy Bat makes the bats livelier and Dead Bounce writes velocities
+	# directly. A ball that leaves the cabinet never drains, so the stage never
+	# ends and the run cannot even be lost.
+	for id in ["heavy_bat", "dead_bounce", "hot_winding"]:
 		Run.add_coil(id)
 	_table = Table.new()
 	add_child(_table)

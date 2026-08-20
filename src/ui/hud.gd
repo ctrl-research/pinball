@@ -63,9 +63,7 @@ const ACTIVE_COLOUR := Color(0.75, 1.0, 1.0)
 
 var _root: Control
 var _type: TextScreen
-var _ante: Label
-var _blind: Label
-var _boss: Label
+var _stage: Label
 var _score: Label
 var _target: Label
 var _mult: Label
@@ -160,7 +158,6 @@ func _build() -> void:
 
 	_panel_backing(Cabinet.PANEL_LEFT)
 	_panel_backing(Cabinet.PANEL_RIGHT)
-	_build_backbox()
 	_build_left()
 	_build_right()
 	_build_overlay()
@@ -181,20 +178,6 @@ func _panel_backing(rect: Rect2) -> void:
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(bg)
 
-
-## The head of the machine. Ante and blind live here rather than in a panel
-## because on a real cabinet this is exactly what the backbox is for, and it
-## puts the one thing that frames the whole stage above the playfield where the
-## player is already looking.
-func _build_backbox() -> void:
-	var box := Cabinet.BACKBOX
-	_ante = _label("", Vector2(box.position.x, box.position.y + 6.0), box.size.x, 13, GOLD)
-	_ante.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_blind = _label("", Vector2(box.position.x, box.position.y + 24.0), box.size.x, 10, INK)
-	_blind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_boss = _label("", Vector2(box.position.x + 4.0, box.position.y + 40.0),
-		box.size.x - 8.0, 8, RED, true)
-	_boss.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
 
 func _build_left() -> void:
@@ -264,7 +247,13 @@ func _build_right() -> void:
 	# Laid out with a running cursor rather than hardcoded offsets. The panel is
 	# a fixed 348px tall and the type is now half again as large, so there is no
 	# slack left for a row that has quietly drifted onto the one below it.
-	var y := p.position.y + 5.0
+	var y := p.position.y + 4.0
+
+	# Which stage this is, at the top where the eye starts. It used to live in a
+	# drawn backbox above the cabinet, which cost the playfield a quarter of the
+	# screen to say two things.
+	_stage = _label("", Vector2(x, y), w, 8, GOLD, true)
+	y += lh(8, 1.0) * 2.0 + 4.0
 
 	_label("SCORE", Vector2(x, y), w, 8, DIM)
 	y += lh(8)
@@ -357,8 +346,8 @@ func _build_right() -> void:
 	# It is also the block that gives up room when type grows: it is read once
 	# and then never again. The tilt warning it used to carry is on the title
 	# screen, which is where anyone actually reads it.
-	var keys := "A / D  flippers\nSPACE  plunge\nQ W E  nudge   1 2 3  items"
-	_label(keys, Vector2(x, p.position.y + p.size.y - lh(8) * 3.0 - 4.0), w, 8, DIM, true)
+	var keys := "A / D  flip    SPACE  plunge\nQ W E  nudge   1 2 3  items"
+	_label(keys, Vector2(x, p.position.y + p.size.y - lh(8) * 2.0 - 4.0), w, 8, DIM, true)
 
 
 ## `wrap` is applied before the size is set, and that order matters: a Label
@@ -419,13 +408,16 @@ func _build_overlay() -> void:
 
 
 func _refresh() -> void:
-	_ante.text = "ANTE %d / %d" % [Run.ante, Catalog.ANTE_BASE.size()]
-	_blind.text = Catalog.BLIND_NAME[Run.blind].to_upper()
+	# One line where the backbox used to spend three. The boss is folded into it
+	# rather than given a row of its own: it is the same fact -- which stage you
+	# are on -- and the full description is on the intro screen, which is where
+	# it is read.
+	var stage_text := "ANTE %d/%d  %s" % [
+		Run.ante, Catalog.ANTE_BASE.size(), Catalog.BLIND_NAME[Run.blind].to_upper()]
 	if Run.boss_id != "":
-		var boss := _boss_def(Run.boss_id)
-		_boss.text = "%s - %s" % [str(boss["name"]).to_upper(), str(boss["desc"])]
-	else:
-		_boss.text = ""
+		stage_text += "\n%s" % str(_boss_def(Run.boss_id)["name"]).to_upper()
+	_stage.text = stage_text
+	_stage.add_theme_color_override("font_color", RED if Run.boss_id != "" else GOLD)
 
 	_score.text = _commas(Run.score)
 	_score.add_theme_color_override("font_color", GOLD if Run.stage_won() else INK)

@@ -26,15 +26,18 @@ const CENTRE_X := 320.0
 ## the number that gives if perspective ever starts costing readability.
 const TOP_SCALE := 0.82
 
-const PLAYFIELD_TOP_Y := 72.0
-const PLAYFIELD_H := 264.0
+## The machine now uses the full height of the screen. It used to start below a
+## drawn backbox, which cost the playfield a quarter of its vertical space to
+## render a head that only ever held two lines of text -- and those two lines
+## read perfectly well in the right-hand panel, where every other number the
+## player tracks already lives.
+const PLAYFIELD_TOP_Y := 6.0
+const PLAYFIELD_H := 336.0
 const PLAYFIELD_BOTTOM_W := 268.0
 const PLAYFIELD_BOTTOM_Y := PLAYFIELD_TOP_Y + PLAYFIELD_H
 
 const RAIL := 8.0
 const LOCKDOWN_H := 12.0
-
-const BACKBOX := Rect2(202.0, 6.0, 236.0, 60.0)
 
 ## Powerups and multipliers left, score right.
 const PANEL_LEFT := Rect2(6.0, 6.0, 166.0, 348.0)
@@ -53,8 +56,6 @@ const RAIL_LIT := Color(0.62, 0.64, 0.78)
 const RAIL_DARK := Color(0.30, 0.31, 0.42)
 const LOCKDOWN_COL := Color(0.70, 0.19, 0.26)
 const LOCKDOWN_LIT := Color(0.88, 0.32, 0.36)
-const SHELL := Color(0.085, 0.080, 0.125)
-const SHELL_EDGE := Color(0.34, 0.36, 0.50)
 
 var viewport: SubViewport
 var _screen: TextureRect
@@ -124,7 +125,6 @@ static func body_quad(outset: float = 0.0) -> PackedVector2Array:
 
 
 func _draw() -> void:
-	_draw_backbox()
 	_draw_body()
 	_draw_lockdown()
 
@@ -161,13 +161,3 @@ func _draw_lockdown() -> void:
 	draw_rect(Rect2(CENTRE_X - half, top + LOCKDOWN_H - 2.0, half * 2.0, 2.0), BODY_EDGE)
 
 
-func _draw_backbox() -> void:
-	draw_rect(BACKBOX.grow(2.0), BODY_EDGE)
-	draw_rect(BACKBOX, SHELL)
-	draw_rect(Rect2(BACKBOX.position + Vector2(3, 3), BACKBOX.size - Vector2(6, 6)),
-		Color(0.045, 0.042, 0.070))
-	draw_rect(BACKBOX.grow(2.0), SHELL_EDGE, false, 1.0)
-	# The neck down to the playfield, so the head is attached to something.
-	var neck_w := 26.0
-	draw_rect(Rect2(CENTRE_X - neck_w * 0.5, BACKBOX.end.y, neck_w,
-		PLAYFIELD_TOP_Y - BACKBOX.end.y), BODY_EDGE)
