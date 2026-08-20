@@ -88,13 +88,16 @@ func _ready() -> void:
 		# playable is a drain with extra steps.
 		{
 			"name": "the ramp carries the ball round to the left orbit",
-			"at": Vector2(200, 210), "capture": "ramp", "shot": Vector2(0, -300),
+			"at": Vector2(207, 188), "capture": "ramp", "shot": Vector2(0, -300),
 			"frames": 700, "reach_x": 60.0,
 			"want_outlane": false, "box": Rect2(0, 0, 0, 0),
 		},
 		{
-			"name": "a ball merely falling past the mouth does not make the ramp",
-			"at": Vector2(200, 170), "no_capture": true, "frames": 60,
+			# Spawned *above* the mouth so it falls straight through it. Dropped
+			# below, this case passed without ever going near the thing it is
+			# supposed to be testing.
+			"name": "a ball merely falling through the mouth does not make the ramp",
+			"at": Vector2(207, 118), "no_capture": true, "frames": 90,
 			"reach_x": 999.0, "want_outlane": false, "box": Rect2(0, 0, 0, 0),
 		},
 		{

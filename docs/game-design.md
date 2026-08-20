@@ -25,9 +25,15 @@ is chips × mult, and it is native vocabulary here — no reskinning required.
 
 ## The screen
 
-The machine is centred and drawn as a machine: a backbox above the playfield, a
-lockdown bar at the near edge, and rails down both sides that converge with the
-playfield as it recedes. A panel brackets it on each side.
+The machine is centred and drawn as a machine: a lockdown bar at the near edge
+and rails down both sides that converge with the playfield as it recedes. A
+panel brackets it on each side.
+
+The cabinet uses the **full height of the screen**. It used to sit below a drawn
+backbox, which spent a quarter of the vertical space rendering a head that held
+two lines of text — and the playfield, which is the game, got what was left.
+Those two lines read perfectly well at the top of the right-hand panel, next to
+every other number the player is tracking.
 
 ```
  640 x 360 viewport
@@ -56,8 +62,10 @@ nudges, money, all of which move while the ball is alive. Putting a number that
 changes every frame next to one that almost never does trains you to stop
 reading either.
 
-Ante and blind live in the **backbox**, because that is what a backbox is for
-and it sits above the playfield where the player is already looking.
+Ante and blind sit at the **top of the right panel**, on one line, with the boss
+folded into it when there is one. They were in a drawn backbox and it was not
+worth the height: the same fact fits in a single row beside the score, and the
+boss's full description is on the intro screen, which is where it is read.
 
 Base resolution is 640×360 with `canvas_items` stretch, so the layout survives
 any window size — same setup as `rogue-like`.
@@ -364,7 +372,6 @@ layout rather than hand-placed in a scene, a mod is just an edit to that data.
 
 - **Extra Bumper** — a fourth pop bumper joins the cluster
 - **Wide Flippers** — +4px flipper length, narrowing the drain gap
-- **Post Rubber** — a centre post between the flippers; catches some drains
 - **Outlane Guards** — narrows both outlanes
 - **Second Spinner** — a spinner on the left orbit
 - **Kicker** — the left outlane kicks the ball back into play once per ball
@@ -399,7 +406,6 @@ never adds a point, it only buys you more chances to score.
 | Heavy Bat | The flipper imparts more speed; harder shots, less control |
 | Long Bat | +4px flipper length *(cut — this is the `Wide Flippers` table mod)* |
 | Magna-Hold | Hold a flipper to catch and cradle the ball for up to 2s |
-| Post Save | A centre post between the flippers, once per ball |
 | Kickback | The left outlane fires the ball back into play, once per stage |
 | Dead Bounce | A ball landing on a *lowered* flipper bounces up instead of rolling to the tip |
 | Second Coil | An upper-left flipper, for shots that are otherwise unreachable |
@@ -560,6 +566,25 @@ away information, not power, and a player who knows the table by feel beats it.
 ## The table
 
 ### The playfield, and what Space Cadet has that this did not
+
+Two placement mistakes were found by firing a spread of angles off each flipper
+and recording what each shot hit first, which is worth doing before trusting any
+claim about where a shot "goes":
+
+- The **saucer** started at (183,152), which is almost exactly where a ball
+  leaving the *left* flipper arrives. The table's most dramatic element was the
+  one the player could not avoid hitting. Moved to the left of the table it is
+  fed by the **right** flipper instead, and each flipper now has one marquee
+  shot: ramp from the left, saucer from the right.
+- The **ramp mouth** started at y=186, directly behind the right slingshot —
+  the line from the left flipper to it crossed the slingshot's face, so the
+  shot was deflected before it ever reached the ramp. Raised above the
+  slingshot's reach, the same shot arrives cleanly at about 39° off vertical.
+
+Its first left-side position also put the saucer *underneath* the ramp's
+descent, which in a top-down projection means the track is drawn over it and the
+saucer is, for practical purposes, not on the table.
+
 
 The original layout was a complete pinball table in the sense that every part of
 it worked, and an incomplete one in the sense that every part of it did the same

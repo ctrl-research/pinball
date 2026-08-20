@@ -64,12 +64,6 @@ const SAUCER_LIP := Color(1.0, 0.84, 0.46)
 const DEAD_BOUNCE_REACH := TableLayout.BALL_RADIUS + TableLayout.FLIPPER_RADIUS + 2.5
 const DEAD_BOUNCE_COOLDOWN_MS := 300.0
 
-## Where the Post Save coil arms: below the flipper pivots, and only for a ball
-## falling down the middle. Armed higher it would fire on balls the player was
-## about to hit perfectly well.
-const POST_ARM_Y := 312.0
-const POST_ARM_WIDTH := 14.0
-
 ## How hard the Kickback coil fires a ball back up the left outlane. Enough to
 ## clear the lane and rejoin the playfield, on the same reasoning as the plunge
 ## floor: a save that returns the ball to the same spot is not a save.
@@ -99,12 +93,8 @@ var _outlane_polys: Array = []
 var _saucer_ball: Ball
 var _saucer_t := 0.0
 var _saucer_cool := 0.0
-var _post: StaticBody2D
-var _post_collision: CollisionShape2D
-## Post Save and Kickback are each one use, and they differ in what resets them:
-## the post is per ball, the kickback per stage. A save you can spend twice on
-## one ball is not a save, it is a wall.
-var _post_used := false
+## Kickback is one use per stage. A save you can spend twice on one ball is not
+## a save, it is a wall.
 var _kickback_used := false
 var _drop_targets: Array[Target] = []
 var _rollovers: Array[Sensor] = []
@@ -161,7 +151,6 @@ func build() -> void:
 	_build_slingshots()
 	_build_targets()
 	_build_sensors()
-	_build_post()
 	_build_gate()
 	_build_drain()
 	_build_fog()
@@ -306,35 +295,6 @@ func _build_sensors() -> void:
 	orbit.scored.connect(_on_scored)
 
 
-func _build_post() -> void:
-	# The mod bolts the post on for the whole run. The Post Save coil raises the
-	# same piece of geometry for one ball at a time, so the body is always built
-	# when either is owned and `_post.disabled` is what differs.
-	if not Run.has_mod("post_rubber") and not Run.has_coil("post_save"):
-		return
-	# Sits below the flipper tips, not between them: at 18px the drain gap is
-	# barely two ball widths, so a post up there would wall it off completely
-	# rather than give you a save you have to earn.
-	var post := StaticBody2D.new()
-	post.position = Vector2(TableLayout.LOWER_CENTRE, 330.0)
-	post.collision_layer = 1
-	post.collision_mask = 0
-	var mat := PhysicsMaterial.new()
-	mat.bounce = 0.9
-	post.physics_material_override = mat
-	var cs := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = 2.5
-	cs.shape = circle
-	post.add_child(cs)
-	add_child(post)
-	_post = post
-	_post_collision = cs
-	# With the mod it stands permanently. As a coil it starts down and rises
-	# once, when a ball is about to be lost.
-	_set_post_up(Run.has_mod("post_rubber"))
-
-
 ## The plunger lane's one-way gate.
 ##
 ## Fails *open*, deliberately. A gate stuck closed traps the ball in the lane
@@ -433,10 +393,6 @@ func serve_ball() -> void:
 		t.reset_target()
 	for r in _rollovers:
 		r.unlight()
-	# The post is per ball; the kickback is per stage and is reset by
-	# `reset_stage_saves()` instead.
-	_post_used = false
-	_set_post_up(Run.has_mod("post_rubber"))
 	# The type is decided here, before the body exists, which is what makes a
 	# ball's size safe to vary at all.
 	Run.take_next_ball()
@@ -486,7 +442,6 @@ func _physics_process(delta: float) -> void:
 	_update_saucer(delta)
 	_apply_bumper_gravity(delta)
 	_apply_dead_bounce()
-	_update_post_save(delta)
 	if Run.effect_active("wormhole"):
 		_portal_t += delta
 		queue_redraw()
@@ -513,34 +468,8 @@ func _track_balls() -> void:
 			b.set_meta("via_outlane", true)
 
 
-func _set_post_up(up: bool) -> void:
-	if _post_collision == null:
-		return
-	# Deferred: this can be reached from inside the physics server's query
-	# flush, which refuses to have collision shapes switched under it.
-	_post_collision.set_deferred("disabled", not up)
-	if _post != null:
-		_post.visible = up
 
 
-## "Post Save": raises the centre post as a ball drops towards the drain, once
-## per ball. It saves a ball headed straight down the middle -- the one loss a
-## player can do least about -- and nothing else.
-func _update_post_save(_delta: float) -> void:
-	if not Run.has_coil("post_save") or _post_used or Run.has_mod("post_rubber"):
-		return
-	for b in balls:
-		if not is_instance_valid(b) or b.in_plunger_lane:
-			continue
-		if b.position.y < POST_ARM_Y or b.linear_velocity.y <= 0.0:
-			continue
-		if absf(b.position.x - TableLayout.LOWER_CENTRE) > POST_ARM_WIDTH:
-			continue
-		_post_used = true
-		_set_post_up(true)
-		Sfx.play("target")
-		Run.toast.emit("POST SAVE")
-		return
 
 
 ## "Dead Bounce": kicks a ball off a *lowered* flipper instead of letting it die
@@ -977,9 +906,9 @@ func _draw_saucer() -> void:
 	# A lit metal rim, because against a dark playfield a dark hole is simply
 	# not there: the first version read as a smudge and gave the player nothing
 	# to aim at. The ring is what makes it a shot.
-	draw_circle(c, r + 2.5, Color(0.10, 0.10, 0.16))
-	draw_circle(c, r + 1.5, SAUCER_RIM)
-	draw_circle(c, r, Color(0.03, 0.03, 0.06))
+	draw_circle(c, r + 3.0, Color(0.10, 0.10, 0.16))
+	draw_circle(c, r + 2.0, SAUCER_RIM)
+	draw_circle(c, r - 0.5, Color(0.03, 0.03, 0.06))
 	# A crescent of light on the far rim, so the hole reads as a bowl sunk into
 	# the wood rather than as a disc lying on it.
 	draw_arc(c, r - 0.5, PI * 1.1, PI * 1.9, 14, SAUCER_LIP, 1.5)

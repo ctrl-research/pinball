@@ -817,15 +817,15 @@ func _coils() -> void:
 	_check(not Run.can_take(offer), "but not the one it already holds")
 	Run.add_coil("hot_winding")
 	Run.add_coil("heavy_bat")
-	_check(not Run.can_take({"kind": "coil", "id": "post_save", "cost": 8}),
+	_check(not Run.can_take({"kind": "coil", "id": "dead_bounce", "cost": 8}),
 		"and a full rack takes nothing")
 
 	# Buying goes through the same path the shop uses.
 	Run.new_run(1092)
 	Run.tokens = 20
-	_check(Run.buy({"kind": "coil", "id": "post_save", "cost": 8}), "a coil can be bought")
+	_check(Run.buy({"kind": "coil", "id": "dead_bounce", "cost": 8}), "a coil can be bought")
 	_eq(Run.tokens, 12, "and is paid for")
-	_check(Run.has_coil("post_save"), "and arrives")
+	_check(Run.has_coil("dead_bounce"), "and arrives")
 
 	# Coils reach the shelf, and a held one is never offered again.
 	Run.new_run(1093)
