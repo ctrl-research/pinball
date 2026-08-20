@@ -127,8 +127,35 @@ applies to that whole class of target, not one instance of it.
 | Spinner | 5 | +4 |
 | Rollover Lanes | 25 | +15 |
 | Orbits | 100 | +60 |
+| Ramp | 90 | +55 |
+| Saucer | 120 | +70 |
 | Jackpot | 500 | +0 |
 <!-- END GENERATED: levels -->
+
+---
+
+## The ramp, the saucer, and the top lanes
+
+Three elements that do more than bounce the ball back.
+
+**The ramp** — the mouth on the right, below the standup targets. A ball that
+enters it is lifted off the playfield, carried over the top of the table, and
+dropped into the **left orbit**, where it runs down past the spinner and into
+the left inlane. It scores on entry and then hands you the orbit and the spinner
+for free, so it is worth more than its own number suggests.
+
+Nothing on the playfield can touch the ball while it is up there. It passes over
+the bumpers and the lanes rather than through them.
+
+**The saucer** — the orange-rimmed hole in the middle right. It swallows the
+ball, holds it for just under a second, and kicks it back down towards the
+flippers. It is the only place on this table where the ball stops, which makes
+it the moment to read your score. It will not take another ball straight away.
+
+**The top lanes** — three of them, under the arch. Each lights as the ball rolls
+through it, and lighting all three pays a bonus worth several more lanes and
+resets them all. They stay lit across balls, so a lane you caught early is still
+lit when you come back to it.
 
 ---
 

@@ -38,6 +38,29 @@ const SHAKE_DECAY := 9.0
 ## How close to the bat a falling ball has to be for Dead Bounce to catch it,
 ## and how long before the same ball can be caught again. The cooldown is what
 ## makes it one kick per landing rather than one per physics tick.
+## Completing the top lanes pays this many lanes' worth on top of the three the
+## player already scored getting there.
+const LANE_GROUP_BONUS := 5
+
+## The ramp's palette. Cool and light against the playfield's warm wood and the
+## walls' lilac-grey, because the one thing the drawing has to say is that this
+## is not another wall.
+const RAMP_RAIL := Color(0.44, 0.52, 0.70)
+const RAMP_FLOOR := Color(0.16, 0.20, 0.31)
+const RAMP_SHEEN := Color(0.30, 0.38, 0.56)
+const RAMP_MOUTH := Color(0.38, 0.64, 0.92)
+
+## The saucer reads warm where the ramp reads cool, so the table's two capture
+## elements are told apart at a glance rather than by memory.
+## How long the saucer stays shut after spitting a ball out.
+## How hard a ball has to be travelling *upward* to make the ramp.
+const RAMP_ENTRY_SPEED := 60.0
+
+const SAUCER_REARM := 0.9
+
+const SAUCER_RIM := Color(0.86, 0.62, 0.28)
+const SAUCER_LIP := Color(1.0, 0.84, 0.46)
+
 const DEAD_BOUNCE_REACH := TableLayout.BALL_RADIUS + TableLayout.FLIPPER_RADIUS + 2.5
 const DEAD_BOUNCE_COOLDOWN_MS := 300.0
 
@@ -73,6 +96,9 @@ var active := false
 var _wall_lines: Array = []
 var _solid_polys: Array = []
 var _outlane_polys: Array = []
+var _saucer_ball: Ball
+var _saucer_t := 0.0
+var _saucer_cool := 0.0
 var _post: StaticBody2D
 var _post_collision: CollisionShape2D
 ## Post Save and Kickback are each one use, and they differ in what resets them:
@@ -233,6 +259,7 @@ func _build_sensors() -> void:
 		add_child(s)
 		s.setup(Catalog.Source.ROLLOVER, TableLayout.ROLLOVER_SIZE)
 		s.scored.connect(_on_scored)
+		s.scored.connect(_check_lane_group.unbind(2))
 		_rollovers.append(s)
 
 	var spinner := Sensor.new()
@@ -240,6 +267,37 @@ func _build_sensors() -> void:
 	add_child(spinner)
 	spinner.setup(Catalog.Source.SPINNER, TableLayout.SPINNER_RECT.size)
 	spinner.scored.connect(_on_scored)
+
+	# The ramp mouth and the saucer are Areas rather than Sensors: a Sensor
+	# scores and lets the ball through, and both of these take the ball away
+	# instead. They report the hit themselves once the capture has happened.
+	var ramp := Area2D.new()
+	ramp.position = TableLayout.RAMP_ENTRY.get_center()
+	ramp.collision_layer = 0
+	ramp.collision_mask = 2
+	var ramp_shape := CollisionShape2D.new()
+	var ramp_rect := RectangleShape2D.new()
+	ramp_rect.size = TableLayout.RAMP_ENTRY.size
+	ramp_shape.shape = ramp_rect
+	ramp.add_child(ramp_shape)
+	add_child(ramp)
+	ramp.body_entered.connect(func(body: Node) -> void:
+		if body is Ball:
+			_enter_ramp(body as Ball))
+
+	var saucer := Area2D.new()
+	saucer.position = TableLayout.SAUCER_CENTRE
+	saucer.collision_layer = 0
+	saucer.collision_mask = 2
+	var saucer_shape := CollisionShape2D.new()
+	var saucer_circle := CircleShape2D.new()
+	saucer_circle.radius = TableLayout.SAUCER_RADIUS
+	saucer_shape.shape = saucer_circle
+	saucer.add_child(saucer_shape)
+	add_child(saucer)
+	saucer.body_entered.connect(func(body: Node) -> void:
+		if body is Ball:
+			_enter_saucer(body as Ball))
 
 	var orbit := Sensor.new()
 	orbit.position = TableLayout.ORBIT_RECT.get_center()
@@ -424,6 +482,8 @@ func _physics_process(delta: float) -> void:
 
 	_track_balls()
 	_catch_escapees()
+	_update_ramp(delta)
+	_update_saucer(delta)
 	_apply_bumper_gravity(delta)
 	_apply_dead_bounce()
 	_update_post_save(delta)
@@ -527,6 +587,112 @@ func _apply_dead_bounce() -> void:
 			break
 
 
+## Lighting every top lane pays a bonus and resets them.
+##
+## Three lanes rather than the two the table had, because two is a pair and
+## three is a *group*: the arch stops being somewhere the ball passes through
+## and becomes a thing with a state the player is trying to advance. The bonus
+## is deliberately worth more than the three lanes that earned it, or completing
+## the set would be worth exactly as much as not bothering.
+func _check_lane_group() -> void:
+	for r in _rollovers:
+		if not r.lit:
+			return
+	for r in _rollovers:
+		r.unlight()
+	var points := Run.register_hit(Catalog.Source.ROLLOVER, LANE_GROUP_BONUS)
+	_on_scored(points, Vector2(TableLayout.LOWER_CENTRE, 56.0))
+	Run.toast.emit("LANES COMPLETE")
+	Sfx.play("drop")
+
+
+## The ramp: carries a ball over the top of the table and drops it into the left
+## orbit.
+##
+## The ball is taken out of the simulation for the trip -- frozen, with its
+## collision off -- and walked along `TableLayout.ramp_path()` by hand. That is
+## what "elevated" has to mean in a top-down projection: there is no third axis
+## to lift it into, so the only honest way to say the ball is above the
+## playfield is for the playfield to stop being able to touch it.
+##
+## It is released heading down the orbit lane rather than dropped still, because
+## a ball that arrives with no speed trickles past the spinner and scores
+## nothing -- which would make the ramp a worse shot than the orbit it feeds.
+func _update_ramp(delta: float) -> void:
+	for b in balls:
+		if not is_instance_valid(b) or not b.held:
+			continue
+		if not b.has_meta("ramp_at"):
+			continue
+		var travelled := float(b.get_meta("ramp_at")) + TableLayout.RAMP_SPEED * delta
+		var total := TableLayout.ramp_length()
+		if travelled >= total:
+			b.remove_meta("ramp_at")
+			b.release(TableLayout.ramp_at(total)[0],
+				Vector2(0.0, TableLayout.RAMP_EXIT_SPEED))
+			continue
+		b.set_meta("ramp_at", travelled)
+		if b.freeze:
+			b.position = TableLayout.ramp_at(travelled)[0]
+	queue_redraw()
+
+
+func _enter_ramp(b: Ball) -> void:
+	if b.held or b.in_plunger_lane:
+		return
+	# The ramp has to be *shot*, not fallen into. Without this the mouth is a
+	# hole in the middle of the right-hand playfield that swallows anything
+	# drifting over it, which makes the table's best shot the one you cannot
+	# help taking. A real ramp is entered from below with pace behind it.
+	if b.linear_velocity.y > -RAMP_ENTRY_SPEED:
+		return
+	b.set_meta("ramp_at", 0.0)
+	b.capture(TableLayout.RAMP_POINTS[0])
+	Sfx.play("lane")
+	_on_scored(Run.register_hit(Catalog.Source.RAMP), TableLayout.RAMP_ENTRY.get_center())
+
+
+## The saucer: swallows the ball, holds it, kicks it back out.
+##
+## Every other element on this table resolves in the same tick it is touched.
+## This one is the only place the ball stops, and that pause is the point --
+## it is the moment a player reads the score they have just built.
+func _update_saucer(delta: float) -> void:
+	_saucer_cool = maxf(0.0, _saucer_cool - delta)
+	if _saucer_ball == null or not is_instance_valid(_saucer_ball):
+		_saucer_ball = null
+		return
+	_saucer_t -= delta
+	if _saucer_ball.freeze:
+		_saucer_ball.position = TableLayout.SAUCER_CENTRE
+	queue_redraw()
+	if _saucer_t > 0.0:
+		return
+	var b := _saucer_ball
+	_saucer_ball = null
+	# Released clear of the mouth, not at its centre. Re-enabling the ball's
+	# collision layer inside the area counts as *entering* it, so a ball handed
+	# back where it was swallowed is swallowed again on the same frame -- which
+	# it was, forever.
+	var out: Vector2 = TableLayout.SAUCER_KICK.normalized() * (
+		TableLayout.SAUCER_RADIUS + b.radius + 2.0)
+	b.release(TableLayout.SAUCER_CENTRE + out, TableLayout.SAUCER_KICK)
+	# And a moment before it will take another, so a ball that is kicked into
+	# something and comes straight back is a shot rather than a trap.
+	_saucer_cool = SAUCER_REARM
+	Sfx.play("plunge")
+
+
+func _enter_saucer(b: Ball) -> void:
+	if b.held or b.in_plunger_lane or _saucer_ball != null or _saucer_cool > 0.0:
+		return
+	b.capture(TableLayout.SAUCER_CENTRE)
+	_saucer_ball = b
+	_saucer_t = TableLayout.SAUCER_HOLD
+	Sfx.play("target")
+	_on_scored(Run.register_hit(Catalog.Source.SAUCER), TableLayout.SAUCER_CENTRE)
+
+
 ## Pulls the ball towards the bumper cluster while Bumper Gravity is running.
 ##
 ## Falls off with distance and stops entirely beyond its range, so the rest of
@@ -554,7 +720,9 @@ func _catch_escapees() -> void:
 		if not is_instance_valid(b):
 			balls.erase(b)
 			continue
-		if PLAY_BOUNDS.has_point(b.position):
+		# A carried ball is exactly where the table put it, which for the top of
+		# the ramp is outside the bounds a rolling ball should ever reach.
+		if b.held or PLAY_BOUNDS.has_point(b.position):
 			continue
 		push_warning("ball escaped the table at %s -- treating it as drained"
 			% b.position.round())
@@ -760,8 +928,65 @@ func _draw() -> void:
 	# reads as a bug, and on a real machine it is a wire flap you barely notice.
 	draw_line(TableLayout.GATE_A, TableLayout.GATE_B, Color(0.34, 0.36, 0.50), 2.0)
 
+	_draw_saucer()
+	_draw_ramp()
 	_draw_portals()
 	_draw_plunger()
+
+
+## The ramp, drawn last of the playfield furniture so it sits over everything it
+## passes above -- which is the only way a top-down projection can say "this is
+## higher than that".
+##
+## Two rails and a floor rather than a single stroke: a bare line reads as
+## another wall, and the whole point of the ramp is that it is not one.
+func _draw_ramp() -> void:
+	var path := TableLayout.ramp_path()
+	var w := TableLayout.RAMP_WIDTH
+
+	# The side face first, offset down-screen and drawn wider, so the track
+	# reads as standing off the playfield rather than painted onto it. This is
+	# the only cue available: there is no third axis to lift it into.
+	draw_polyline(TableLayout.shift(path, TableLayout.EXTRUDE * 2.0),
+		Color(0.04, 0.04, 0.07), w + 5.0)
+	# Cool metal against the warm wood, so it does not read as more wall. The
+	# walls are lilac-grey; this is deliberately bluer and lighter.
+	draw_polyline(path, RAMP_RAIL, w + 4.0)
+	draw_polyline(path, RAMP_FLOOR, w)
+	# A highlight down the centre of the floor, which is what makes a flat
+	# stroke read as a channel with two raised edges.
+	draw_polyline(path, RAMP_SHEEN, 2.0)
+
+	# The mouth, brighter than the track, because the entry is the thing the
+	# player is aiming at and the rest is just where the ball goes afterwards.
+	var mouth := TableLayout.RAMP_ENTRY
+	draw_rect(mouth.grow(1.0), Color(0.06, 0.07, 0.11))
+	draw_rect(mouth, RAMP_RAIL)
+	draw_rect(mouth.grow(-2.0), RAMP_MOUTH)
+	draw_rect(mouth, Color(0.72, 0.86, 1.0), false, 1.0)
+
+	# The ball riding it needs no drawing here: balls are child nodes, and a
+	# parent's _draw runs before its children, so it is already over the rails.
+
+
+## The saucer: a hole, so it is drawn as depth rather than as a lamp -- a dark
+## well with a lit rim, and the ball sunk into it while it is held.
+func _draw_saucer() -> void:
+	var c := TableLayout.SAUCER_CENTRE
+	var r := TableLayout.SAUCER_RADIUS
+	# A lit metal rim, because against a dark playfield a dark hole is simply
+	# not there: the first version read as a smudge and gave the player nothing
+	# to aim at. The ring is what makes it a shot.
+	draw_circle(c, r + 2.5, Color(0.10, 0.10, 0.16))
+	draw_circle(c, r + 1.5, SAUCER_RIM)
+	draw_circle(c, r, Color(0.03, 0.03, 0.06))
+	# A crescent of light on the far rim, so the hole reads as a bowl sunk into
+	# the wood rather than as a disc lying on it.
+	draw_arc(c, r - 0.5, PI * 1.1, PI * 1.9, 14, SAUCER_LIP, 1.5)
+	if _saucer_ball != null and is_instance_valid(_saucer_ball):
+		# Sunk: drawn smaller and dimmer than a ball on the playfield, because
+		# it is below the surface rather than on it.
+		draw_circle(c, _saucer_ball.radius * 0.8, _saucer_ball.tint.darkened(0.35))
 
 
 ## The wood, lit from the near end.

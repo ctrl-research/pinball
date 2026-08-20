@@ -6,7 +6,7 @@ extends RefCounted
 
 # --- Scoring sources ----------------------------------------------------------
 
-enum Source { BUMPER, SLINGSHOT, DROP, STANDUP, SPINNER, ROLLOVER, ORBIT, JACKPOT }
+enum Source { BUMPER, SLINGSHOT, DROP, STANDUP, SPINNER, ROLLOVER, ORBIT, RAMP, SAUCER, JACKPOT }
 
 ## Base value and per-level gain for each class of target. Levelling a *class*
 ## rather than an instance is what makes a table mod that adds a fourth bumper
@@ -19,6 +19,12 @@ const SOURCE_STATS := {
 	Source.SPINNER: {"name": "Spinner", "base": 5, "per_level": 4},
 	Source.ROLLOVER: {"name": "Rollover Lanes", "base": 25, "per_level": 15},
 	Source.ORBIT: {"name": "Orbits", "base": 100, "per_level": 60},
+	# Both are deliberate shots rather than things that happen to a ball, so
+	# both pay like the orbit does. The ramp pays a little less because it also
+	# hands you the orbit and the spinner on the way down -- it is worth more
+	# than its own number says.
+	Source.RAMP: {"name": "Ramp", "base": 90, "per_level": 55},
+	Source.SAUCER: {"name": "Saucer", "base": 120, "per_level": 70},
 	Source.JACKPOT: {"name": "Jackpot", "base": 500, "per_level": 0},
 }
 
