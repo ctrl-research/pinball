@@ -194,6 +194,74 @@ func _process(delta: float) -> void:
 # --- Lifecycle ----------------------------------------------------------------
 
 
+## --- Saving ---
+##
+## Only run-scoped state is written. A resumed run restarts the stage it was on
+## rather than restoring mid-ball: the ball's position, its velocity and every
+## timer on the table would all have to come back consistent with each other,
+## and a stage you were halfway through is a strange thing to be handed back
+## anyway. Losing the current stage's progress is the honest cost, and it is the
+## same bargain Balatro makes.
+func to_dict() -> Dictionary:
+	return {
+		"ante": ante,
+		"blind": blind,
+		"tokens": tokens,
+		"trinkets": trinkets,
+		"consumables": consumables,
+		"consumable_stacks": consumable_stacks,
+		"ball_slots": ball_slots,
+		"ball_levels": ball_levels,
+		"coils": coils,
+		"mods": mods,
+		"levels": levels,
+		"seed_value": seed_value,
+		"best_stage_score": best_stage_score,
+		"best_stage_label": best_stage_label,
+		"best_chain": best_chain,
+		"ball_uses": ball_uses,
+	}
+
+
+func from_dict(data: Dictionary) -> void:
+	# Seeded and reset first, so anything the save does not carry is left at a
+	# sane default rather than at whatever the previous run had in it.
+	new_run(int(data.get("seed_value", 0)))
+
+	ante = int(data.get("ante", 1))
+	blind = int(data.get("blind", Catalog.SMALL))
+	tokens = int(data.get("tokens", 0))
+	best_stage_score = int(data.get("best_stage_score", 0))
+	best_stage_label = str(data.get("best_stage_label", ""))
+	best_chain = int(data.get("best_chain", 0))
+	ball_levels = data.get("ball_levels", {})
+	levels = data.get("levels", {})
+	ball_uses = data.get("ball_uses", {})
+
+	# `assign` rather than `=` on every typed array.
+	#
+	# ConfigFile does round-trip the element type, so `=` happens to work for a
+	# file this build wrote -- that was measured, not assumed. `assign` is here
+	# for every other source: a hand-edited save, a file from a build whose
+	# containers were shaped differently, anything that arrives as a plain
+	# Array. Assigning an untyped Array to an Array[String] fails at *runtime*
+	# in GDScript -- it prints and carries on, leaving the old contents in
+	# place, which reads as the save having quietly forgotten half the run.
+	trinkets.assign(data.get("trinkets", []))
+	consumables.assign(data.get("consumables", ["", "", ""]))
+	consumable_stacks.assign(data.get("consumable_stacks", [0, 0, 0]))
+	ball_slots.assign(data.get("ball_slots", []))
+	coils.assign(data.get("coils", []))
+	mods.assign(data.get("mods", []))
+
+	begin_stage()
+	trinkets_changed.emit()
+	consumables_changed.emit()
+	balls_changed.emit()
+	coils_changed.emit()
+	tokens_changed.emit()
+
+
 func new_run(with_seed: int = 0) -> void:
 	seed_value = with_seed if with_seed != 0 else int(Time.get_unix_time_from_system())
 	rng.seed = seed_value

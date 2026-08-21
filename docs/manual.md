@@ -40,6 +40,17 @@ three — beating the target early does not end the stage, it means the rest is
 played for money instead of survival. Win or lose is decided once, when the last
 ball drains.
 
+### Leaving and coming back
+
+A run is saved at the start of every stage. Quit and the title screen offers
+**CONTINUE**, which picks up at the beginning of the stage you were on — you
+keep your money, trinkets, coils, balls, mods and target levels, and replay the
+stage itself from its first ball.
+
+Starting a new run from the title screen discards the saved one.
+
+The CRT toggle (**F1**) is remembered between sessions.
+
 ### When the run ends
 
 Victory or defeat, the last screen carries a summary of the run:

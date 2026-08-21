@@ -76,6 +76,16 @@ jobs:
           ./godot --headless --path . --quit-after 8000 tests/inlane_test.tscn 2>&1 | tee -a build.log
           grep -q "INLANE_TEST_OK" build.log
 
+      # A run written to disk and read back, field by field. The failure mode
+      # here is silence -- a save that quietly forgets half the run looks
+      # exactly like one that worked -- so the round trip is asserted rather
+      # than spot-checked.
+      - name: Save round-trip test
+        run: |
+          set -euo pipefail
+          ./godot --headless --path . tests/save_test.tscn 2>&1 | tee -a build.log
+          grep -q "SAVE_TEST_OK" build.log
+
       # What the flippers do to a ball, asserted against measurements. The coil
       # layer was designed on two claims about them and one was false -- a held
       # flipper already cradles -- so both are now pinned here.

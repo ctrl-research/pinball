@@ -784,6 +784,35 @@ inserts, a segmented-LED score readout on the panel.
   stays editable in a diff rather than in a paint program. Walls stay drawn —
   they are generated geometry and a mod can move them.
 
+## Saving
+
+Two files, because they have different lifetimes. `user://settings.cfg` is
+preferences and should survive everything. `user://run.save` is one run in
+progress and is deleted the moment that run ends — a stale run file is worse
+than none, because it offers to continue something that is already over.
+
+**A resumed run restarts the stage it was on.** Only run-scoped state is
+written: money, trinkets, consumables and their stacks, coils, ball slots and
+levels, mods, target levels, the seed, and the summary stats. Restoring
+mid-stage would mean bringing back the ball's position, its velocity and every
+timer on the table consistent with each other — and being handed a
+half-finished stage is a strange thing anyway. Losing the current stage's
+progress is the honest cost, and it is the bargain Balatro makes too.
+
+The save carries a **format number** and a run written by an older shape is
+discarded rather than half-read. This is a game: the cost of dropping one
+in-progress run is far below the cost of restoring one into a state the rules no
+longer describe.
+
+`tests/save_test.gd` asserts the round trip field by field, because the failure
+mode is silence — a save that quietly forgets the player's trinkets looks
+exactly like a save that worked. Its most important case loads from *plain,
+untyped* containers, which is what any source other than this build's own
+`ConfigFile` hands over: assigning an untyped `Array` to an `Array[String]`
+fails at runtime in GDScript without stopping anything, and it aborts the rest
+of the function with it. Without `assign()` that case loses five fields, and it
+was measured, not assumed.
+
 ## Plans
 
 Work that is designed but not built keeps its plan next to the design:
