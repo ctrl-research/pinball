@@ -104,9 +104,10 @@ MULT is the ball you have built and lose on the drain. Fever is the last two
 seconds. The contact that *starts* a combo scores at ×1 — only the ones after it
 are worth more.
 
-The right-hand panel shows the current fever, pips counting the contacts banked
-toward the next level, and a bar counting down the two seconds you have left to
-keep the chain alive.
+The right-hand panel shows the current fever above a meter of **five segments** —
+one per contact needed for the next level — with a hairline under them counting
+down the two seconds you have left to keep the chain alive. At the cap all five
+turn gold, because there is no next level to fill.
 
 Combo Coil and the Ember ball make fever build **twice as fast**. Both work on
 the contacts needed — three instead of five — rather than on the size of a

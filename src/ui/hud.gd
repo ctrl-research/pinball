@@ -48,6 +48,11 @@ const PIP_RADIUS := 4.0
 const PIP_PITCH := 12.0
 
 const FEVER_COLOUR := Color(1.0, 0.45, 0.55)
+## Gold at the cap, so a full meter cannot be mistaken for a nearly-full one.
+const FEVER_MAXED := Color(1.0, 0.78, 0.36)
+const FEVER_SEG_H := 6.0
+const FEVER_TIMER_GAP := 2.0
+const FEVER_TIMER_H := 2.0
 ## Coils are hardware, so they take the rail colour rather than a score colour.
 const COIL_COLOUR := Color(0.62, 0.66, 0.82)
 const RED := Color(0.94, 0.36, 0.40)
@@ -75,7 +80,7 @@ var _fever: Label
 var _fever_head: Label
 var _queue: Label
 var _queue_pips: Control
-var _fever_bar: ColorRect
+var _fever_meter: Control
 var _toast_label: Label
 var _progress: ColorRect
 var _slots: Array[Control] = []
@@ -110,12 +115,12 @@ func _process(delta: float) -> void:
 
 	var fever := Run.fever
 	_fever.text = "x%s" % _trim(fever)
-	_fever_head.text = "FEVER  MAX" if fever >= Run.FEVER_MAX else "FEVER  %s" % _pips(
-		Run.fever_hits_done(), Run.FEVER_HITS_PER_LEVEL)
+	# The header no longer repeats the progress: the meter below it says the same
+	# thing in a form you can read without counting.
+	_fever_head.text = "FEVER  MAX" if fever >= Run.FEVER_MAX else "FEVER"
 	_fever.add_theme_color_override("font_color",
 		FEVER_COLOUR if fever > 1.0 else DIM)
-	_fever_bar.size.x = (Cabinet.PANEL_RIGHT.size.x - 8.0) * clampf(
-		Run.fever_remaining() / Run.FEVER_WINDOW, 0.0, 1.0)
+	_fever_meter.queue_redraw()
 
 	for i in _coil_labels.size():
 		_coil_labels[i].text = ("- " + str(Catalog.COILS[Run.coils[i]]["name"]).to_upper()
@@ -258,12 +263,12 @@ func _build_right() -> void:
 	_label("SCORE", Vector2(x, y), w, 8, DIM)
 	y += lh(8)
 	_score = _label("0", Vector2(x, y), w, 20, INK)
-	y += lh(20) + 4.0
+	y += lh(20) + 2.0
 
 	_label("TARGET", Vector2(x, y), w, 8, DIM)
 	y += lh(8)
 	_target = _label("0", Vector2(x, y), w, 14, INK)
-	y += lh(14) + 4.0
+	y += lh(14) + 2.0
 
 	# A bar as well as the numbers. "12,480 of 20,000" is arithmetic the player
 	# has to do mid-ball; a bar is the same fact at a glance.
@@ -273,7 +278,7 @@ func _build_right() -> void:
 	track.color = Color(0.14, 0.14, 0.21)
 	track.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(track)
-	y += 12.0
+	y += 10.0
 
 	_progress = ColorRect.new()
 	_progress.position = Vector2.ZERO
@@ -283,7 +288,7 @@ func _build_right() -> void:
 	track.add_child(_progress)
 
 	_status = _label("", Vector2(x, y), w, 9, GOLD)
-	y += lh(9) + 2.0
+	y += lh(9)
 	_balls = _label("", Vector2(x, y), w, 10, INK)
 	y += lh(10)
 
@@ -307,35 +312,32 @@ func _build_right() -> void:
 	_nudge = _label("", Vector2(x, y), w, 10, INK)
 	y += lh(10) + 3.0
 	_tokens = _label("", Vector2(x, y), w, 14, GOLD)
-	y += lh(14) + 4.0
+	y += lh(14) + 2.0
 
 	# Fever lives here rather than beside MULT because this panel is the
 	# fast-moving one, and fever is the fastest number in the game -- it climbs
 	# on every contact and falls off a cliff two seconds later.
 	# The header carries the progress pips, the same way BALLS and NUDGE do.
-	# With five contacts to a level the number itself now sits still most of the
-	# time, and a meter that only moves once every five hits looks broken unless
-	# something shows the four hits in between.
+	# With five contacts to a level the number itself sits still most of the
+	# time, so the meter below it carries the four hits in between.
 	_fever_head = _label("FEVER", Vector2(x, y), w, 8, DIM)
 	y += lh(8)
-	_fever = _label("x1", Vector2(x, y), w, 18, FEVER_COLOUR)
-	y += lh(18) + 2.0
+	_fever = _label("x1", Vector2(x, y), w, 16, FEVER_COLOUR)
+	y += lh(16) + 2.0
 
-	var fever_track := ColorRect.new()
-	fever_track.position = Vector2(x, y)
-	fever_track.size = Vector2(w, 4.0)
-	fever_track.color = Color(0.14, 0.14, 0.21)
-	fever_track.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(fever_track)
-	y += 12.0
-
-	# The bar is the *timer*, not the size of the multiplier: what the player
-	# needs to know mid-ball is how long they have left to keep it alive.
-	_fever_bar = ColorRect.new()
-	_fever_bar.size = Vector2(0.0, 4.0)
-	_fever_bar.color = FEVER_COLOUR
-	_fever_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fever_track.add_child(_fever_bar)
+	# One segment per contact needed, and a hairline timer under them.
+	#
+	# It used to be a single continuous bar showing only the timer, with the
+	# progress hidden in asterisks up in the header. That put the two halves of
+	# the same mechanic in two places and rendered the one the player is
+	# actively working on as punctuation. Segments say "five hits to the next
+	# level" without anyone having to be told.
+	_fever_meter = Control.new()
+	_fever_meter.position = Vector2(x, y)
+	_fever_meter.size = Vector2(w, FEVER_SEG_H + FEVER_TIMER_GAP + FEVER_TIMER_H)
+	_fever_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_fever_meter.draw.connect(_draw_fever)
+	_root.add_child(_fever_meter)
 
 	# Anchored to the panel floor rather than left on the cursor. It is the last
 	# block, so it is the one that silently walks off the bottom of the panel
@@ -484,6 +486,39 @@ func _refresh() -> void:
 			text.text = "%d  --" % (i + 1)
 			text.add_theme_color_override("font_color", DIM)
 			_consumable_slots[i].color = EMPTY_SLOT
+
+
+## Five segments -- one per contact needed for the next level -- and a hairline
+## under them counting down the two seconds the chain has left.
+##
+## Both facts are about the same mechanic and belong together: the segments are
+## what the player is building, the hairline is how long they have to keep
+## building it.
+func _draw_fever() -> void:
+	var w := _fever_meter.size.x
+	var n := Run.FEVER_HITS_PER_LEVEL
+	# At the cap there is no next level to fill, so the meter reads as complete
+	# rather than as empty -- which is what it would show, since progress stops
+	# being banked once there is nothing to spend it on.
+	var maxed := Run.fever >= Run.FEVER_MAX
+	var done := n if maxed else Run.fever_hits_done()
+
+	var gap := 2.0
+	var seg := (w - gap * float(n - 1)) / float(n)
+	for i in n:
+		var box := Rect2(float(i) * (seg + gap), 0.0, seg, FEVER_SEG_H)
+		_fever_meter.draw_rect(box, EMPTY_SLOT)
+		if i < done:
+			_fever_meter.draw_rect(box, FEVER_MAXED if maxed else FEVER_COLOUR)
+		else:
+			_fever_meter.draw_rect(box, Color(0.20, 0.20, 0.29), false, 1.0)
+
+	var track_y := FEVER_SEG_H + FEVER_TIMER_GAP
+	_fever_meter.draw_rect(Rect2(0.0, track_y, w, FEVER_TIMER_H), Color(0.14, 0.14, 0.21))
+	var left := clampf(Run.fever_remaining() / Run.FEVER_WINDOW, 0.0, 1.0)
+	if left > 0.0:
+		_fever_meter.draw_rect(Rect2(0.0, track_y, w * left, FEVER_TIMER_H),
+			FEVER_COLOUR.darkened(0.25))
 
 
 ## The ball in play followed by everything still to come. Before the first
