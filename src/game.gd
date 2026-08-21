@@ -44,6 +44,10 @@ func _ready() -> void:
 func _enter_intro() -> void:
 	# A new stage, so the once-a-stage saves come back.
 	table.reset_stage_saves()
+	# Written at the stage boundary, which is exactly what a resumed run comes
+	# back to. Saving more often would promise a precision the resume does not
+	# have.
+	Save.save_run()
 	state = State.INTRO
 	table.active = false
 	table.build()
@@ -75,12 +79,16 @@ func _enter_shop() -> void:
 
 func _enter_lost() -> void:
 	state = State.LOST
+	# The run is over, so the file has to go. A save left behind offers to
+	# continue something that has already ended.
+	Save.clear_run()
 	table.active = false
 	Sfx.play("lose")
 	hud.show_lost()
 
 
 func _enter_won() -> void:
+	Save.clear_run()
 	state = State.WON
 	table.active = false
 	Sfx.play("win")

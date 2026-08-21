@@ -51,6 +51,10 @@ func _input(event: InputEvent) -> void:
 	# be able to turn it off without editing the project.
 	if event.is_action_pressed(TOGGLE_ACTION):
 		enabled = not enabled
+		# Written straight away rather than on quit: a preference that only
+		# survives a clean exit is a preference that does not survive a crash,
+		# and this is one boolean.
+		Save.save_settings()
 		# Null while the tree is being torn down.
 		var vp := get_viewport()
 		if vp != null:

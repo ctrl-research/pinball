@@ -8,6 +8,7 @@ const DIM := Color(0.48, 0.50, 0.64)
 
 var _seed_field: LineEdit
 var _type: TextScreen
+var _default: Button
 ## change_scene_to_file is deferred to the end of the frame, so the menu is
 ## still live and still taking input after PLAY is pressed. Without this guard
 ## a second press starts a second run, throwing away the first before anyone
@@ -38,6 +39,10 @@ func _ready() -> void:
 		+ "Bolt something onto the machine. Do it again, harder.",
 		Vector2(0, 143), 8, DIM)
 
+	# Settings are applied before anything is drawn, so the CRT does not flicker
+	# on for a frame before being turned off.
+	Save.load_settings()
+
 	var play := Button.new()
 	play.text = "PLAY"
 	play.position = Vector2(255, 194)
@@ -46,8 +51,22 @@ func _ready() -> void:
 	play.pressed.connect(_play)
 	_type.host().add_child(play)
 
-	_text("seed (optional)", Vector2(0, 240), 8, DIM)
+	# Offered only when there is something to continue, and placed above the seed
+	# field because a run in progress makes the seed irrelevant.
+	if Save.has_run():
+		var resume := Button.new()
+		resume.text = "CONTINUE"
+		resume.position = Vector2(255, 232)
+		resume.size = Vector2(130, 26)
+		resume.add_theme_font_size_override("font_size", Style.pt(11))
+		resume.pressed.connect(_resume)
+		_type.host().add_child(resume)
+		_default = resume
+		_text("or start a new run above", Vector2(0, 262), 8, DIM)
+	else:
+		_text("seed (optional)", Vector2(0, 240), 8, DIM)
 	_seed_field = LineEdit.new()
+	_seed_field.visible = not Save.has_run()
 	_seed_field.position = Vector2(255, 256)
 	_seed_field.size = Vector2(130, 24)
 	_seed_field.alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -62,7 +81,13 @@ func _ready() -> void:
 		Vector2(0, 300), 8, DIM)
 	_text("Nudge too often and the machine tilts.", Vector2(0, 322), 8, DIM)
 
-	play.grab_focus()
+	# Whichever is the likely intent takes the focus ring, because that is what
+	# the keyboard acts on. With a run in progress that is CONTINUE -- focusing
+	# PLAY would mean a stray Return discards the saved run, which is the one
+	# outcome here that cannot be undone.
+	if _default == null:
+		_default = play
+	_default.grab_focus()
 
 
 func _input(event: InputEvent) -> void:
@@ -79,7 +104,23 @@ func _play() -> void:
 	if _starting:
 		return
 	_starting = true
+	# Starting fresh abandons whatever was saved, and says so by deleting it
+	# before the new run can overwrite it with its own first stage.
+	Save.clear_run()
 	Run.new_run(_seed_field.text.hash() if _seed_field.text.strip_edges() != "" else 0)
+	get_tree().change_scene_to_file("res://scenes/game.tscn")
+
+
+## Picks up where the last run left off, at the start of the stage it was on.
+func _resume() -> void:
+	if _starting:
+		return
+	if not Save.load_run():
+		# The file was there and would not parse. Falling through to a fresh run
+		# is better than a dead button.
+		_play()
+		return
+	_starting = true
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 

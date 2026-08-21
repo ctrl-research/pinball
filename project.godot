@@ -25,6 +25,7 @@ Run="*res://src/autoload/run.gd"
 Sfx="*res://src/autoload/sfx.gd"
 Style="*res://src/autoload/style.gd"
 Crt="*res://src/autoload/crt.gd"
+Save="*res://src/autoload/save.gd"
 
 [display]
 
