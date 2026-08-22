@@ -16,7 +16,7 @@ var _failures := 0
 ## a failed typed assignment, say -- aborts that function without touching the
 ## failure count, so the suite would otherwise print OK having quietly skipped
 ## everything after the error. This is the check that caught exactly that.
-const SECTIONS := 17
+const SECTIONS := 18
 
 var _sections := 0
 
@@ -39,6 +39,7 @@ func _ready() -> void:
 	_balls()
 	_summary()
 	_coils()
+	_celebrations()
 
 	if _sections != SECTIONS:
 		_failures += 1
@@ -851,4 +852,68 @@ func _coils() -> void:
 	_check(Run.has_coil("dead_bounce"), "a coil survives the next stage")
 	Run.new_run(1096)
 	_eq(Run.coils.size(), 0, "and only a new run clears it")
+	_sections += 1
+
+
+## When the game stops to shout at the player.
+##
+## Both signals are rules about the run rather than decoration, which is why
+## they live in Run and are tested here: the HUD only draws what it is told, and
+## a banner that fires twice -- or fires for something the player did not do --
+## is a bug in the rule, not in the drawing.
+func _celebrations() -> void:
+	Run.new_run(1100)
+	# Counted into an Array rather than an int. GDScript lambdas capture locals
+	# *by value*, so `hits += 1` inside one increments the closure's own copy
+	# and the outer variable never moves -- which reads exactly like the signal
+	# never firing.
+	var hits: Array = []
+	Run.target_reached.connect(func() -> void: hits.append(true))
+
+	Run.target = 100
+	Run.register_hit(Catalog.Source.ORBIT, 1)  # exactly 100, which is "reached"
+	_eq(hits.size(), 1, "crossing the target announces it")
+	Run.register_hit(Catalog.Source.ORBIT, 5)
+	_eq(hits.size(), 1, "and scoring past it does not announce it again")
+
+	# A new stage re-arms it, because it is a new target.
+	Run.begin_stage()
+	Run.target = 50
+	Run.register_hit(Catalog.Source.ORBIT, 1)
+	_eq(hits.size(), 2, "the next stage announces its own target")
+
+	# MULT milestones are whole numbers only.
+	Run.new_run(1101)
+	var milestones: Array = []
+	Run.mult_milestone.connect(func(whole: int) -> void: milestones.append(whole))
+
+	Run.add_mult(0.4)  # x1.4
+	_eq(milestones.size(), 0, "a fractional gain is not a milestone")
+	Run.add_mult(0.4)  # x1.8
+	_eq(milestones.size(), 0, "nor is a second one that stays under")
+	Run.add_mult(0.3)  # x2.1
+	_eq(milestones, [2], "crossing 2 is")
+	Run.add_mult(0.5)  # x2.6
+	_eq(milestones, [2], "and drifting within 2 is not")
+	Run.add_mult(1.9)  # x4.5 -- skips 3
+	_eq(milestones, [2, 4], "a jump announces where it landed, once")
+
+	# A ball reset drops MULT back to 1, and the next climb must announce again
+	# rather than being swallowed by the high-water mark.
+	Run.begin_ball()
+	_eq(Run.mult, 1.0, "a new ball starts at x1")
+	milestones.clear()
+	Run.add_mult(1.0)
+	_eq(milestones, [2], "so x2 is news again on the next ball")
+
+	# A stage bonus that starts the ball above x1 is not something the player
+	# just did, and must not be announced as if it were.
+	Run.new_run(1102)
+	Run.stage_mult_bonus = 1.5
+	milestones.clear()
+	Run.begin_ball()
+	_eq(milestones.size(), 0, "a stage bonus does not announce itself at serve")
+	_check(Run.mult >= 2.5, "even though it starts the ball well above x1")
+	Run.add_mult(1.0)
+	_eq(milestones, [3], "and the next real crossing still lands")
 	_sections += 1

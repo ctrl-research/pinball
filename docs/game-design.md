@@ -193,6 +193,30 @@ numbers that make the ante curve meaningless.
 same problem fever solves. It now builds fever twice as fast instead — two
 systems for "you are hitting things quickly" is one more than a player can read.
 
+### The banner
+
+Two moments are worth interrupting for: passing the stage target, and the
+multiplier crossing a whole number. Both get flashing text across the middle of
+the screen for a second and a half — a hard white/colour alternation rather than
+a sine fade, because a pixel display blinks rather than dims, and an overshoot
+on the way in so it lands rather than merely appears.
+
+Both are emitted from `Run` as signals rather than detected in the HUD, because
+both are rules about the run and the HUD's job is to draw what it is told. The
+MULT one *watches* `mult_changed` rather than being fired at each of the six
+places MULT moves: a milestone is a property of the number, not of whichever
+trinket happened to move it, and a seventh caller should not have to remember to
+announce itself.
+
+The rule has two edges worth stating, and both are tested. A jump that skips a
+number announces where it landed and not each number on the way. And a stage
+bonus that starts a ball above ×1 is not announced at all — the milestone is
+rebased at serve, because a banner should mark something the player just did.
+
+The toast that used to read `TARGET MET - PLAY ON FOR BONUS` now reads only
+*play on for the bonus*: the banner says the first three words far louder, and
+two places saying the same thing is a waste of both.
+
 ### The end-of-run summary
 
 A run is twenty-four stages long and the only thing a player otherwise carries
