@@ -69,6 +69,7 @@ const ACTIVE_COLOUR := Color(0.75, 1.0, 1.0)
 var _root: Control
 var _type: TextScreen
 var _stage: Label
+var _keys: Label
 var _score: Label
 var _target: Label
 var _mult: Label
@@ -348,8 +349,11 @@ func _build_right() -> void:
 	# It is also the block that gives up room when type grows: it is read once
 	# and then never again. The tilt warning it used to carry is on the title
 	# screen, which is where anyone actually reads it.
-	var keys := "A / D  flip    SPACE  plunge\nQ W E  nudge   1 2 3  items"
-	_label(keys, Vector2(x, p.position.y + p.size.y - lh(8) * 2.0 - 4.0), w, 8, DIM, true)
+	_keys = _label(keymap_text(pad_connected()),
+		Vector2(x, p.position.y + p.size.y - lh(8) * 2.0 - 4.0), w, 8, DIM, true)
+	# Swapped live rather than read once at build time: a pad plugged in
+	# mid-run should stop the panel telling the player to press Q.
+	Input.joy_connection_changed.connect(_on_pad_changed)
 
 
 ## `wrap` is applied before the size is set, and that order matters: a Label
@@ -486,6 +490,27 @@ func _refresh() -> void:
 			text.text = "%d  --" % (i + 1)
 			text.add_theme_color_override("font_color", DIM)
 			_consumable_slots[i].color = EMPTY_SLOT
+
+
+## Whether to show pad prompts. Split out from `keymap_text` so the text itself
+## can be asserted for both cases in a test, on a machine that has no controller
+## plugged into it.
+static func pad_connected() -> bool:
+	return not Input.get_connected_joypads().is_empty()
+
+
+## The one place that says which input does what during play.
+##
+## Telling a player on a controller to press Q / W / E is worse than saying
+## nothing: it is a mechanic they will conclude the game does not have.
+static func keymap_text(pad: bool) -> String:
+	if pad:
+		return "L / R  flip    A  plunge\nD-PAD  nudge   X Y B  items"
+	return "A / D  flip    SPACE  plunge\nQ W E  nudge   1 2 3  items"
+
+
+func _on_pad_changed(_device: int, _connected: bool) -> void:
+	_keys.text = keymap_text(pad_connected())
 
 
 ## Five segments -- one per contact needed for the next level -- and a hairline

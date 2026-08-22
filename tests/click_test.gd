@@ -33,6 +33,8 @@ func _ready() -> void:
 	await _test_sell()
 	await _test_on_screen()
 	_test_panel_fits()
+	await _test_pad_reach()
+	_test_prompts()
 	_finish()
 
 
@@ -87,6 +89,86 @@ func _test_sell() -> void:
 		print("  ok: a click on the inventory sells the item")
 
 
+## Both sets of prompts, asserted on a machine with no controller attached.
+func _test_prompts() -> void:
+	var keys := Hud.keymap_text(false)
+	var pad := Hud.keymap_text(true)
+	if keys == pad:
+		_fail("the pad prompts are identical to the key prompts")
+	elif not (keys.contains("SPACE") and keys.contains("Q W E")):
+		_fail("the key prompts do not name keys: %s" % keys)
+	elif pad.contains("SPACE") or pad.contains("Q W E"):
+		_fail("the pad prompts still name keys: %s" % pad)
+	elif not (pad.contains("D-PAD") and pad.contains("A  plunge")):
+		_fail("the pad prompts do not name pad buttons: %s" % pad)
+	elif keys.count("\n") != 1 or pad.count("\n") != 1:
+		# The panel has room for exactly two lines, and the fit test above only
+		# ever sees whichever set this machine happens to show.
+		_fail("a prompt set is not two lines (keys %d, pad %d)"
+			% [keys.count("\n") + 1, pad.count("\n") + 1])
+	else:
+		print("  ok: both prompt sets name the right inputs and fit two lines")
+
+
+## Every control in the shop must be reachable with a d-pad.
+##
+## The shop is the only screen in the game that cannot be operated from the
+## keyboard alone -- every other overlay is one focused button and `ui_accept`.
+## On a controller the d-pad moves focus between *neighbours*, so a button that
+## no neighbour points at is a button that does not exist for anyone playing on
+## a pad, however well it works with a mouse.
+##
+## Walked as a breadth-first search over all four directions from wherever the
+## shop puts focus, because that is exactly what a player does when they cannot
+## find something.
+func _test_pad_reach() -> void:
+	Run.trinkets.assign(["deadhead", "combo_coil"])
+	Run._clear_consumables()
+	Run.add_consumable("surge")
+	Run.coils.assign(["kickback"])
+	_game._enter_shop()
+	await _settle()
+
+	var want: Array[Button] = []
+	_collect_buttons(_game.hud, want)
+	if want.size() < 4:
+		_fail("the shop built only %d buttons -- nothing to navigate" % want.size())
+		return
+
+	var start: Control = _game.hud._root.get_viewport().gui_get_focus_owner()
+	if start == null:
+		_fail("the shop starts with nothing focused, so a pad has no way in")
+		return
+
+	var reached := {start: true}
+	var queue: Array[Control] = [start]
+	while not queue.is_empty():
+		var node: Control = queue.pop_front()
+		for side in [SIDE_TOP, SIDE_BOTTOM, SIDE_LEFT, SIDE_RIGHT]:
+			var next := node.find_valid_focus_neighbor(side)
+			if next != null and not reached.has(next):
+				reached[next] = true
+				queue.append(next)
+
+	var missed: Array[String] = []
+	for button in want:
+		if not reached.has(button):
+			missed.append(button.text)
+	if not missed.is_empty():
+		_fail("%d of %d shop buttons cannot be reached with a d-pad: %s"
+			% [missed.size(), want.size(), missed])
+	else:
+		print("  ok: all %d shop buttons are reachable with a d-pad" % want.size())
+
+
+func _collect_buttons(node: Node, into: Array[Button]) -> void:
+	for child in node.get_children():
+		if child is Button and (child as Button).is_visible_in_tree() \
+				and not (child as Button).disabled:
+			into.append(child as Button)
+		_collect_buttons(child, into)
+
+
 ## The right panel's last flowing element must not run into the block anchored
 ## to its floor.
 ##
@@ -98,10 +180,10 @@ func _test_sell() -> void:
 ## above the keys.
 func _test_panel_fits() -> void:
 	var meter: Control = _game.hud._fever_meter
-	var keys: Label = null
-	for child in _game.hud._root.get_children():
-		if child is Label and (child as Label).text.begins_with("A / D"):
-			keys = child as Label
+	# Held by reference rather than found by its text: the key map now reads
+	# differently when a pad is plugged in, and a search for "A / D" would go
+	# quietly green on the exact machine the prompts were changed for.
+	var keys: Label = _game.hud._keys
 	if keys == null:
 		_fail("the key map is missing from the panel")
 		return

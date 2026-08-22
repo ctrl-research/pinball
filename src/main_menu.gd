@@ -77,7 +77,7 @@ func _ready() -> void:
 	# on the one control the player types into.
 	add_child(_seed_field)
 
-	_text("A / D or arrows flip   SPACE plunges   Q / W / E nudge",
+	_text(Hud.keymap_text(Hud.pad_connected()).replace("\n", "    "),
 		Vector2(0, 300), 8, DIM)
 	_text("Nudge too often and the machine tilts.", Vector2(0, 322), 8, DIM)
 

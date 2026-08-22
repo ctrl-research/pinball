@@ -26,6 +26,7 @@ Sfx="*res://src/autoload/sfx.gd"
 Style="*res://src/autoload/style.gd"
 Crt="*res://src/autoload/crt.gd"
 Save="*res://src/autoload/save.gd"
+Controls="*res://src/autoload/controls.gd"
 
 [display]
 
