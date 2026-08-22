@@ -37,7 +37,7 @@ Three things the game does not have. All were confirmed by grep, not assumed:
 | --- | --- | --- |
 | ~~No gamepad support~~ | **Done.** `src/autoload/controls.gd` | — |
 | ~~No persistence of any kind~~ | **Done.** `src/autoload/save.gd` | — |
-| **Web-only export** | `export_presets.cfg` contains one preset, `platform="Web"` | No desktop build exists to upload |
+| ~~Web-only export~~ | **Done.** macOS, Linux and Windows presets, all three exporting cleanly | — |
 
 ### 1a. Gamepad — **done**
 
@@ -72,9 +72,25 @@ Minimum for a paid release:
   stage, longest combo and most-used ball. Persisting those across runs is a
   small step and is what makes a "best ever" screen possible.
 
-### 1c. Desktop exports
+### 1c. Desktop exports — **done**
 
-- Windows, Linux, macOS presets in `export_presets.cfg`.
+- Windows, Linux and macOS presets are in `export_presets.cfg` and all three
+  export without errors. macOS is universal (x86_64 + arm64); the other two are
+  x86_64.
+- Universal macOS needs `textures/vram_compression/import_etc2_astc` enabled or
+  Godot refuses the arm64 half outright. It is on now; this project has almost
+  no textures, so it costs nothing.
+- **macOS codesigning is not optional even for local use.** With signing
+  disabled the bundle keeps the *export template's* signature, which no longer
+  matches once the `.pck` is injected -- `spctl` reports "code has no resources
+  but signature indicates they must be present", and an invalid signature is
+  fatal on Apple Silicon rather than merely a warning. The preset ad-hoc signs
+  (`codesign/codesign=1`), which verifies strictly and launches.
+- `spctl -a` still reports "rejected", and that is expected: it assesses against
+  the *distribution* policy, which no un-notarised app passes. It does not block
+  a locally built app, because Gatekeeper only gates bundles carrying
+  `com.apple.quarantine` -- i.e. downloads. Shipping to anyone else is what
+  needs a Developer ID and notarisation.
 - The project runs the **GL Compatibility** renderer, which is the safest choice
   here — it covers old hardware and the Steam Deck without fuss. The CRT shader
   samples `hint_screen_texture`, which is supported there; verify on each
@@ -153,9 +169,9 @@ finish.
 
 ## Suggested order
 
-1. **Desktop export presets** — smallest step, and it tells you immediately
-   whether the shaders behave off the web. *Still to do; needs the export
-   templates installed, which is a ~1.2GB download.*
+1. ~~**Desktop export presets**~~ — done. Not wired into CI: the desktop
+   templates are a large download and would slow every build, so this belongs on
+   a tag rather than on every push.
 2. ~~**Gamepad support**~~ — done.
 3. ~~**Persistence**~~ — settings and run resume done; cross-run stats still to
    do.

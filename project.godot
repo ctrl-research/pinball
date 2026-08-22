@@ -111,6 +111,11 @@ common/physics_ticks_per_second=120
 
 [rendering]
 
+; Required for the universal (arm64 + x86_64) macOS export -- Godot refuses to
+; build for arm64 without it. This project has almost no textures to compress,
+; so it costs nothing here.
+textures/vram_compression/import_etc2_astc=true
+
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/canvas_textures/default_texture_filter=0
