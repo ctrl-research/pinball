@@ -50,6 +50,13 @@ const PIP_PITCH := 12.0
 const FEVER_COLOUR := Color(1.0, 0.45, 0.55)
 ## Gold at the cap, so a full meter cannot be mistaken for a nearly-full one.
 const FEVER_MAXED := Color(1.0, 0.78, 0.36)
+## The centre banner: how long it holds, how fast it blinks, and how far it
+## overshoots on the way in.
+const BANNER_SIZE := 26
+const BANNER_TIME := 1.6
+const BANNER_FLASH_HZ := 7.0
+const BANNER_POP := 0.35
+
 const FEVER_SEG_H := 6.0
 const FEVER_TIMER_GAP := 2.0
 const FEVER_TIMER_H := 2.0
@@ -70,6 +77,9 @@ var _root: Control
 var _type: TextScreen
 var _stage: Label
 var _keys: Label
+var _banner: Label
+var _banner_t := 0.0
+var _banner_colour := Color.WHITE
 var _score: Label
 var _target: Label
 var _mult: Label
@@ -102,10 +112,13 @@ func _ready() -> void:
 			Run.consumables_changed, Run.balls_changed, Run.tokens_changed,
 			Run.stage_changed, Run.nudges_changed, Run.coils_changed]:
 		s.connect(_refresh)
+	Run.target_reached.connect(_on_target_reached)
+	Run.mult_milestone.connect(_on_mult_milestone)
 	_refresh()
 
 
 func _process(delta: float) -> void:
+	_animate_banner(delta)
 	if _toast_t > 0.0:
 		_toast_t -= delta
 		if _toast_t <= 0.0:
@@ -166,6 +179,7 @@ func _build() -> void:
 	_panel_backing(Cabinet.PANEL_RIGHT)
 	_build_left()
 	_build_right()
+	_build_banner()
 	_build_overlay()
 
 
@@ -374,6 +388,71 @@ func _label(text: String, pos: Vector2, width: float, size: int, colour: Color,
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(l)
 	return l
+
+
+## The centre-screen banner: the two moments the game stops to shout about.
+##
+## Built after the panels and before the overlay, so it sits over the playfield
+## and under the between-stage screens -- it should never be caught half-faded
+## behind a shop.
+func _build_banner() -> void:
+	_banner = _label("", Vector2.ZERO, Cabinet.VIEW.x, BANNER_SIZE, GOLD)
+	_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_banner.position = Vector2(0.0, Cabinet.VIEW.y * 0.5 - float(Style.pt(BANNER_SIZE)))
+	_banner.size = Vector2(Cabinet.VIEW.x, float(Style.pt(BANNER_SIZE)) * 2.0)
+	# Scaled about its own centre, so the pop grows outwards rather than
+	# dragging the text off to the right.
+	_banner.pivot_offset = _banner.size * 0.5
+	_banner.visible = false
+
+
+## Shows `text` in the middle of the screen for a moment.
+##
+## Deliberately not a toast. A toast is a note in the corner you may or may not
+## read; this interrupts, because both things it announces are worth looking up
+## for -- and both are *momentary*, so it cannot afford to be subtle.
+func banner(text: String, colour: Color) -> void:
+	_banner.text = text
+	_banner_colour = colour
+	_banner_t = BANNER_TIME
+	_banner.visible = true
+
+
+func _animate_banner(delta: float) -> void:
+	if _banner_t <= 0.0:
+		return
+	_banner_t = maxf(0.0, _banner_t - delta)
+	if _banner_t == 0.0:
+		_banner.visible = false
+		return
+
+	var elapsed := BANNER_TIME - _banner_t
+	# Flash: hard alternation rather than a sine fade, because a pixel display
+	# blinks, it does not dim. White on the off-beat so the colour still reads.
+	var lit := fmod(elapsed * BANNER_FLASH_HZ, 1.0) < 0.5
+	_banner.add_theme_color_override("font_color",
+		Color.WHITE if lit else _banner_colour)
+
+	# A quick pop out to full size, then a slow settle -- the overshoot is what
+	# makes it land rather than merely appear.
+	var pop := 1.0 + BANNER_POP * exp(-elapsed * 9.0) * cos(elapsed * 26.0)
+	_banner.scale = Vector2(pop, pop)
+
+	# Fades out over the last third only, so it is at full strength for as long
+	# as it is readable.
+	var fade := clampf(_banner_t / (BANNER_TIME * 0.34), 0.0, 1.0)
+	_banner.modulate.a = fade
+
+
+func _on_target_reached() -> void:
+	banner("TARGET MET", GOLD)
+	Sfx.play("win")
+
+
+func _on_mult_milestone(whole: int) -> void:
+	banner("MULT  x%d" % whole, FEVER_COLOUR)
+	Sfx.play("drop")
 
 
 func _build_overlay() -> void:
