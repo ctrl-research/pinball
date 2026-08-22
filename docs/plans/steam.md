@@ -35,11 +35,11 @@ Three things the game does not have. All were confirmed by grep, not assumed:
 
 | Gap | Evidence | Why Steam needs it |
 | --- | --- | --- |
-| **No gamepad support** | Zero `Joypad*` entries in `project.godot`, zero in `src/` | A keyboard-only game is effectively unplayable on Steam Deck and rates poorly on controller-first stores |
-| **No persistence of any kind** | No `FileAccess`, `ConfigFile` or `user://` anywhere in `src/` | Settings do not survive a restart; a run cannot be resumed; nothing is remembered between sessions |
+| ~~No gamepad support~~ | **Done.** `src/autoload/controls.gd` | — |
+| ~~No persistence of any kind~~ | **Done.** `src/autoload/save.gd` | — |
 | **Web-only export** | `export_presets.cfg` contains one preset, `platform="Web"` | No desktop build exists to upload |
 
-### 1a. Gamepad (largest player-facing gap)
+### 1a. Gamepad — **done**
 
 The input map has ten actions: `flip_left`, `flip_right`, `plunge`,
 `nudge_left/right/up`, `use_consumable_1..3`, `toggle_crt`. A natural mapping:
@@ -50,13 +50,15 @@ The input map has ten actions: `flip_left`, `flip_right`, `plunge`,
 - Nudge → **left stick** direction, or the three remaining face buttons.
 - Consumables → **d-pad**.
 
-The shop and all overlays are mouse-driven. Every overlay already focuses its
-continue button so `ui_accept` works, but **the shop's buy and sell rows are
-mouse-only** — that is exactly what `click_test` was written to protect, and on
-a controller it means the shop cannot be used at all. Focus-based navigation
-between shop rows is required, not optional.
+**The shop turned out not to need new navigation code.** The claim above --
+that its buy and sell rows are mouse-only and that focus navigation would have
+to be built -- was wrong: Godot resolves focus neighbours geometrically, and
+every row in the shop is already reachable with a d-pad. `click_test` now proves
+it by walking all four directions from wherever the shop puts focus and
+asserting every button is reached, and it was checked against a deliberate break
+(making offer rows mouse-focus-only leaves 4 of 11 unreachable).
 
-### 1b. Persistence
+### 1b. Persistence — **done**
 
 Minimum for a paid release:
 
@@ -152,10 +154,11 @@ finish.
 ## Suggested order
 
 1. **Desktop export presets** — smallest step, and it tells you immediately
-   whether the shaders behave off the web.
-2. **Gamepad support**, including controller navigation of the shop. Biggest
-   player-facing gap and the one that gates Steam Deck.
-3. **Persistence** — settings, then run resume, then stats.
+   whether the shaders behave off the web. *Still to do; needs the export
+   templates installed, which is a ~1.2GB download.*
+2. ~~**Gamepad support**~~ — done.
+3. ~~**Persistence**~~ — settings and run resume done; cross-run stats still to
+   do.
 4. **Store page up** (starts the two-week clock running in parallel with the
    rest).
 5. **Steam integration** — achievements and cloud, once saves exist.

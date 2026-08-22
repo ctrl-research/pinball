@@ -15,15 +15,22 @@ disagree, this one is right — the tables below are generated from the same
 
 ## Controls
 
-| Key | Does |
-| --- | --- |
-| **A** / **←** | Left flipper |
-| **D** / **→** | Right flipper |
-| **SPACE** | Plunger — hold to charge, release to fire |
-| **Q** / **W** / **E** | Nudge left / up / right |
-| **1** / **2** / **3** | Fire the consumable in that slot |
-| **F1** | Toggle the CRT effect |
-| **Enter** | The button on any between-stage screen |
+Keyboard and controller both work at once, and the panel shows whichever you
+have plugged in.
+
+| Does | Keyboard | Controller |
+| --- | --- | --- |
+| Left flipper | **A** / **←** | **L1** |
+| Right flipper | **D** / **→** | **R1** |
+| Plunger — hold to charge | **SPACE** | **A** |
+| Nudge left / up / right | **Q** / **W** / **E** | d-pad left / up / right |
+| Fire the consumable in a slot | **1** / **2** / **3** | **X** / **Y** / **B** |
+| Toggle the CRT effect | **F1** | **Back** |
+| The button on any between-stage screen | **Enter** | **A** |
+
+Menus and the shop take the d-pad to move between items and **A** to choose —
+the same **A** that plunges, because the affirmative button should mean the same
+thing in both places.
 
 Holding the plunger longer fires harder. Even a tap clears the arch — the charge
 controls *where* the ball ends up, not whether it gets into play.
