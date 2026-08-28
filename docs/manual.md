@@ -179,6 +179,25 @@ lit when you come back to it.
 
 ---
 
+## The banner
+
+Two moments stop the game to tell you about themselves, in flashing text across
+the middle of the screen:
+
+- **TARGET MET**, the first time a stage's score target is passed. It fires
+  once; scoring further does not repeat it. The panel adds *play on for the
+  bonus*, because the stage is not over — the rest of it is played for the
+  overkill payout.
+- **MULT ×N**, whenever the multiplier crosses a whole number. Drifting from
+  ×2.1 to ×2.6 is not a milestone; reaching ×3 is. A jump that skips a number
+  announces where it landed, once.
+
+MULT resets to ×1 between balls, so the same crossing is news again on the next
+ball. A stage bonus that starts a ball above ×1 is *not* announced — you did not
+just do it.
+
+---
+
 ## Nudging and tilt
 
 Nudging shoves the ball a few pixels — the only tool against a bad bounce. The

@@ -10,6 +10,11 @@ extends Node
 
 signal score_changed
 signal mult_changed
+## The moments worth stopping the player to show them. Both are emitted from
+## here rather than detected in the HUD, because both are rules about the run
+## and the HUD's job is to draw them.
+signal target_reached
+signal mult_milestone(whole: int)
 signal trinkets_changed
 signal consumables_changed
 signal balls_changed
@@ -130,6 +135,9 @@ var _ball_saved_this_stage := false
 # --- Ball-scoped state --------------------------------------------------------
 
 var mult := 1.0
+## The highest whole MULT already announced this ball. Falls back down with MULT
+## itself, or a reset between balls would leave the next x2 unannounced.
+var _mult_milestone := 1
 var nudges := float(MAX_NUDGES)
 var tilted := false
 var _hits_this_ball := 0
@@ -167,6 +175,11 @@ var _ghost_saves := 0
 
 func _ready() -> void:
 	new_run()
+	# Watched rather than checked at each of the six places MULT changes. A
+	# milestone is a property of the number, not of whichever trinket happened
+	# to move it, and a seventh caller should not have to remember to announce
+	# itself.
+	mult_changed.connect(_check_mult_milestone)
 
 
 ## How far Slow Ball winds the world down.
@@ -381,8 +394,20 @@ func begin_ball() -> void:
 	fever_changed.emit()
 	_hits_since_jackpot = 0
 	_hits_since_reset = 0
+	# Rebased before the signal goes out, so a stage bonus that starts the ball
+	# above x1 is not announced as something the player just achieved.
+	_mult_milestone = int(floor(mult))
 	mult_changed.emit()
 	nudges_changed.emit()
+
+
+func _check_mult_milestone() -> void:
+	var whole := int(floor(mult))
+	if whole > _mult_milestone:
+		_mult_milestone = whole
+		mult_milestone.emit(whole)
+	elif whole < _mult_milestone:
+		_mult_milestone = whole
 
 
 ## Called when a ball leaves play. Returns true if a trinket put it back.
@@ -633,7 +658,10 @@ func _bank(points: int) -> void:
 	if not target_met and score >= target:
 		target_met = true
 		balls_left_at_target = balls_left
-		toast.emit("TARGET MET - PLAY ON FOR BONUS")
+		target_reached.emit()
+		# The banner says TARGET MET; this says what to do about it. Two places
+		# saying the same three words would be a waste of both.
+		toast.emit("PLAY ON FOR THE BONUS")
 	if has_trinket("penny_slot"):
 		_penny_progress += points
 		while _penny_progress >= 1000:
